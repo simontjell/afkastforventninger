@@ -50,31 +50,77 @@ def endpoints(d: dict) -> dict[str, float]:
     return out
 
 
+PAGE_CSS = (
+    "body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}"
+    "code{background:#f3f3f3;padding:.1em .3em;border-radius:3px}"
+    "td{padding:.15em 1.2em .15em 0}td.n{text-align:right;font-variant-numeric:tabular-nums}"
+    "@media(prefers-color-scheme:dark){body{background:#161616;color:#ddd}code{background:#262626}a{color:#8ab4f8}}"
+)
+
+
+def listing_html(folder: Path, node: dict) -> str:
+    """Oversigtsside for en mappe: links til alt, der ligger direkte under den."""
+    e = html.escape
+    parts = folder.relative_to(SITE).parts
+    crumbs = [f"<a href='{'../' * len(parts)}'>afkastforventninger</a>"]
+    for i, part in enumerate(parts):
+        up = "../" * (len(parts) - 1 - i) or "./"
+        crumbs.append(f"<a href='{up}'>{e(part)}</a>")
+    rows = []
+    # mapper først (horisonter i naturlig rækkefølge, resten alfabetisk), derefter tallene
+    hz = {"1-5": 0, "6-10": 1, "1-10": 2, "11-plus": 3}
+    folders = sorted((k for k, v in node.items() if isinstance(v, dict)),
+                     key=lambda k: (hz.get(k, 9), k))
+    values = [k for k, v in node.items() if not isinstance(v, dict)]
+    for name in folders + values:
+        child = node[name]
+        if isinstance(child, dict):
+            rows.append(f"<tr><td><a href='{e(name)}/'>{e(name)}/</a></td><td></td>"
+                        f"<td><a href='{e(name)}.json'>{e(name)}.json</a></td></tr>")
+        else:
+            rows.append(f"<tr><td><a href='{e(name)}'>{e(name)}</a></td><td class=n>{fmt(child)}</td>"
+                        f"<td><a href='{e(name)}.json'>{e(name)}.json</a></td></tr>")
+    path = "/".join(parts)
+    return (
+        f"<!doctype html>\n<html lang=\"da\"><meta charset=\"utf-8\">"
+        f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+        f"<title>{e(path)} – Afkastforventninger</title>\n<style>{PAGE_CSS}</style>\n"
+        f"<p>{' / '.join(crumbs)}</p>\n"
+        f"<p>Alt herunder som JSON: <a href='../{e(parts[-1])}.json'>{e(parts[-1])}.json</a></p>\n"
+        f"<table>{''.join(rows)}</table>\n</html>\n")
+
+
+def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
+    """Det generelle mønster for en mappe X:
+
+      X/        HTML-side med links til det, der ligger direkte under X
+      X.json    alle tal under X som JSON (application/json)
+      X/navn    et enkelt tal; X/navn.json er det samme som application/json
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "index.html").write_text(listing_html(folder, node))
+    if own_json:
+        folder.with_name(folder.name + ".json").write_text(
+            json.dumps(node, indent=2, ensure_ascii=False) + "\n")
+    for name, child in node.items():
+        if isinstance(child, dict):
+            write_tree(folder / name, child)
+        else:
+            (folder / f"{name}.html").write_text(fmt(child))
+            (folder / f"{name}.json").write_text(fmt(child) + "\n")
+
+
 def write_period(base: Path, d: dict) -> int:
     eps = endpoints(d)
-    for rel, v in eps.items():
-        p = base / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
-        s = fmt(v)
-        p.with_name(p.name + ".html").write_text(s)
-
-    # Hver mappe svarer med alt, der ligger under den, som JSON:
-    # .../inflation/ -> {"1-5": 0.018, "6-10": 0.018, ...}
     tree: dict = {}
     for rel, v in eps.items():
         node = tree
         *dirs, leaf = rel.split("/")
         for seg in dirs:
             node = node.setdefault(seg, {})
-        node[leaf] = json.loads(fmt(v))
-
-    def write_index(folder: Path, node: dict) -> None:
-        (folder / "index.html").write_text(json.dumps(node, ensure_ascii=False))
-        for name, child in node.items():
-            if isinstance(child, dict):
-                write_index(folder / name, child)
-
-    write_index(base, tree)
+        node[leaf] = v
+    # Halvårets egen .json er den fulde udgave med navne og korrelationer.
+    write_tree(base, tree, own_json=False)
     base.with_name(base.name + ".json").write_text(
         json.dumps(d, indent=2, ensure_ascii=False) + "\n")
     return len(eps)
@@ -92,7 +138,9 @@ def patterns_html(index: dict) -> str:
         ("afkast for en bestemt horisont", "/{år}/h{1|2}/{horisont}/{aktivklasse}"),
         ("et bestemt nøgletal", "/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
         ("inflationsforventning", "/{år}/h{1|2}/inflation/{horisont}"),
-        ("alle tal under en sti som JSON: afslut med /", "/{år}/h{1|2}/inflation/"),
+        ("ethvert tal som application/json: tilføj .json", "/{år}/h{1|2}/{aktivklasse}.json"),
+        ("alle tal under en mappe som JSON: mappens navn + .json", "/{år}/h{1|2}/inflation.json"),
+        ("oversigt med links til det underliggende: afslut med /", "/{år}/h{1|2}/inflation/"),
         ("horisontafkast", "/{år}/h{1|2}/horisontafkast"),
         ("alt for halvåret, inkl. korrelationer", "/{år}/h{1|2}.json"),
         (f"nyeste offentliggjorte ({index['latest']})", "/latest/…"),
@@ -122,8 +170,10 @@ def examples_html(index: dict) -> str:
         (f"Fees i fonde for private equity, 1-10 år, {navn}", f"{per}/1-10/fees-i-fonde/private-equity"),
         (f"Afkast på aktier fra år 11 og frem, {navn}", f"{per}/11-plus/aktier"),
         (f"Inflationsforventning, 1-5 år, {navn}", f"{per}/inflation/1-5"),
-        (f"Inflationsforventning for alle horisonter, {navn}", f"{per}/inflation/"),
-        (f"Afkast for alle aktivklasser, 1-5 år, {navn}", f"{per}/1-5/afkast/"),
+        (f"Inflationsforventning for alle horisonter som JSON, {navn}", f"{per}/inflation.json"),
+        (f"Afkast for alle aktivklasser som JSON, 1-5 år, {navn}", f"{per}/1-5/afkast.json"),
+        ("Samme tal i det halvår, der gælder i dag", "current/1-5/afkast.json"),
+        (f"Oversigt med links til alt under {navn}", f"{per}/"),
         (f"Horisontafkast, {navn}", f"{per}/horisontafkast"),
         ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "latest/ejendomme"),
         ("Afkast på ejendomme i det halvår, der gælder i dag", "current/ejendomme"),
@@ -164,8 +214,7 @@ def openapi(index: dict) -> dict:
     }
     number = {
         "200": {"description": "Tallet som decimaltal (0.067 = 6,7 %).",
-                # GitHub Pages sender text/html for adresser uden endelse; indholdet er JSON.
-                "content": {"text/html": {"schema": {"type": "number"}, "example": 0.067}}},
+                "content": {"application/json": {"schema": {"type": "number"}, "example": 0.067}}},
         "404": {"description": "Kombinationen findes ikke."},
     }
     obj = lambda desc: {
@@ -193,16 +242,16 @@ def openapi(index: dict) -> dict:
             "operationId": f"get{op or 'Halvaar'}" + ("" if not op else "Halvaar"),
             "summary": "Alt for halvåret, inkl. korrelationer." + note,
             "parameters": [ref(x) for x in pp], "responses": obj("Hele halvåret.")}}
-        paths[f"{prefix}/inflation/"] = {"get": {
+        paths[f"{prefix}/inflation.json"] = {"get": {
             "operationId": f"get{op}InflationAlle",
             "summary": "Inflationsforventning for alle horisonter." + note
-                       + " Alle mapper svarer på samme måde med tallene under sig, når adressen ender på /.",
+                       + " Alle mapper svarer på samme måde: mappens navn + .json giver tallene under den.",
             "parameters": [ref(x) for x in pp],
-            "responses": {"200": {"description": "Horisont -> inflation.", "content": {"text/html": {
+            "responses": {"200": {"description": "Horisont -> inflation.", "content": {"application/json": {
                 "schema": {"type": "object", "additionalProperties": {"type": "number"}},
                 "example": {"1-5": 0.018, "6-10": 0.018, "1-10": 0.018, "11-plus": 0.02}}}}}}}
         for tail, name, summary, tp in values:
-            paths[f"{prefix}/{tail}"] = {"get": {
+            paths[f"{prefix}/{tail}.json"] = {"get": {
                 "operationId": f"get{op}{name}", "summary": summary + note,
                 "parameters": [ref(x) for x in pp + tp], "responses": number}}
     return {
@@ -213,8 +262,9 @@ def openapi(index: dict) -> dict:
             "description": (
                 "Uofficielt, statisk API med tallene fra Rådet for Afkastforventninger "
                 "(https://afkastforventninger.dk/afkastforventninger). Hver adresse svarer med "
-                "ét decimaltal som JSON (fx 0.067). Bemærk: GitHub Pages sender Content-Type "
-                "text/html for disse adresser, selv om indholdet er JSON. Kun GET."),
+                "ét decimaltal (fx 0.067). Skemaet beskriver .json-adresserne, som har Content-Type "
+                "application/json. Samme adresse uden .json giver tallet som text/html, og en mappe "
+                "afsluttet med / giver en HTML-oversigt med links. Kun GET."),
         },
         "servers": [{"url": BASE_URL}],
         "paths": paths,
@@ -246,7 +296,7 @@ som decimaltal på faste adresser. Dette er et uofficielt API (uden lovning om k
 <p>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
 <h2>Eksempler</h2>
 <ul class="ex">{examples}</ul>
-<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Indholdet er gyldig JSON.</p>
+<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Tilføj <code>.json</code> til en adresse for <code>application/json</code>; en mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
 <h2>Mønstre</h2>
 <pre>{patterns}</pre>
 <p>Maskinlæsbar beskrivelse: <a href="openapi.json">openapi.json</a> (OpenAPI 3.1).</p>
@@ -278,6 +328,11 @@ def main() -> int:
     n = 0
     for key, d in data.items():
         n += write_period(SITE / str(d["aar"]) / f"h{d['halvaar']}", d)
+    for year in sorted({d["aar"] for d in data.values()}):
+        folder = SITE / str(year)
+        halves = {f"h{d['halvaar']}": {} for d in data.values() if d["aar"] == year}
+        (folder / "index.html").write_text(listing_html(folder, dict(sorted(halves.items()))).replace(
+            f"<p>Alt herunder som JSON: <a href='../{year}.json'>{year}.json</a></p>\n", ""))
     write_period(SITE / "latest", data[latest])
     write_period(SITE / "current", data[current])
 

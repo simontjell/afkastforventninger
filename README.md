@@ -17,7 +17,9 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 | `/{år}/h{1\|2}/{horisont}/{aktivklasse}` | afkast for horisonten |
 | `/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}` | et bestemt nøgletal |
 | `/{år}/h{1\|2}/inflation/{horisont}` | inflationsforventning |
-| en mappe, fx `/{år}/h{1\|2}/inflation/` | alle tal under stien som JSON-objekt |
+| en adresse + `.json` | samme tal som `application/json` |
+| en mappe + `.json`, fx `/{år}/h{1\|2}/inflation.json` | alle tal under mappen som JSON-objekt |
+| en mappe + `/`, fx `/{år}/h{1\|2}/inflation/` | HTML-oversigt med links til det underliggende |
 | `/{år}/h{1\|2}/horisontafkast` | horisontafkast (fra 2021 h2) |
 | `/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
 | `/latest/…` | nyeste offentliggjorte halvår |
@@ -34,9 +36,9 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 - **Nøgletal:** `afkast`, `standardafvigelse`, `investeringsomkostninger`, og hvor rådet
   oplyser dem: `fees-i-fonde`, `afkast-unhedged`, `loebende-afkast`, `kursaendring`.
 
-Svaret er tallet alene som JSON (`0.067` = 6,7 %), uden endelse på adressen. GitHub Pages
-sender dog `Content-Type: text/html` for adresser uden endelse; indholdet kan læses som JSON
-alligevel (`fetch(url).then(r => r.json())`).
+Svaret er tallet alene (`0.067` = 6,7 %). GitHub Pages vælger content-type ud fra endelsen:
+uden endelse er det `text/html`, med `.json` er det `application/json`. Mønsteret gælder på alle
+niveauer: `X.json` er alt under `X` som JSON, og `X/` er en side med links til det underliggende.
 
 ```bash
 curl https://simontjell.github.io/afkastforventninger/2027/h1/1-5/globale-aktier-developed-markets
