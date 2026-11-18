@@ -268,63 +268,6 @@ def current_period(periods: list[str], today: dt.date) -> str:
     return max((p for p in periods if p <= now), default=periods[0])
 
 
-def patterns_html(index: dict) -> str:
-    """Stimønstrene med kommentar over hver og simpel syntaksfarvning."""
-    items = [
-        (f"afkast, {DEFAULT_HORIZON} år", "/api/{år}/h{1|2}/{aktivklasse}.json"),
-        ("afkast for en bestemt horisont", "/api/{år}/h{1|2}/{horisont}/{aktivklasse}.json"),
-        ("et bestemt nøgletal", "/api/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}.json"),
-        ("inflationsforventning", "/api/{år}/h{1|2}/inflation/{horisont}.json"),
-        ("alle tal under en mappe som JSON: mappens navn + .json", "/api/{år}/h{1|2}/inflation.json"),
-        ("oversigt med links til det underliggende: afslut med /", "/api/{år}/h{1|2}/inflation/"),
-        ("horisontafkast", "/api/{år}/h{1|2}/horisontafkast.json"),
-        ("alt for halvåret, inkl. korrelationer", "/api/{år}/h{1|2}.json"),
-        (f"nyeste offentliggjorte ({index['latest']})", "/api/latest/…"),
-        (f"gældende i dag ({index['current']})", "/api/current/…"),
-        ("start her og klik dig ned gennem det hele", "/api/"),
-        ("halvår, aktivklasser, horisonter og nøgletal", "/index.json"),
-    ]
-    out = []
-    for comment, pattern in items:
-        p = re.sub(
-            r"(\{[^}]*\})|(/|…|\.json)",
-            lambda m: f"<span class={'v' if m.group(1) else 'p'}>{html.escape(m.group(0))}</span>",
-            pattern)
-        out.append(f"<span class=c># {html.escape(comment)}</span>\n{p}")
-    return "\n\n".join(out)
-
-
-
-def examples_html(index: dict) -> str:
-    """Punktliste med eksempler: beskrivelse efterfulgt af link, der viser adressen."""
-    y, h = index["latest"].split("-")
-    per = f"{y}/{h}"
-    navn = f"{h[1]}. halvår {y}"
-    items = [
-        ("Start her: oversigt med links til alle halvår", "api/"),
-        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"api/{per}/globale-aktier-developed-markets.json"),
-        (f"Samme, men på horisonten 1-5 år", f"api/{per}/1-5/globale-aktier-developed-markets.json"),
-        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"api/{per}/6-10/standardafvigelse/hedgefonde.json"),
-        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"api/{per}/1-10/fees-i-fonde/private-equity.json"),
-        (f"Afkast på aktier fra år 11 og frem, {navn}", f"api/{per}/11-plus/aktier.json"),
-        (f"Inflationsforventning, 1-5 år, {navn}", f"api/{per}/inflation/1-5.json"),
-        (f"Inflationsforventning for alle horisonter, {navn}", f"api/{per}/inflation.json"),
-        (f"Afkast for alle aktivklasser, 1-5 år, {navn}", f"api/{per}/1-5/afkast.json"),
-        ("Samme tal i det halvår, der gælder i dag", "api/current/1-5/afkast.json"),
-        (f"Oversigt med links til alt under {navn}", f"api/{per}/"),
-        (f"Horisontafkast, {navn}", f"api/{per}/horisontafkast.json"),
-        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "api/latest/ejendomme.json"),
-        ("Afkast på ejendomme i det halvår, der gælder i dag", "api/current/ejendomme.json"),
-        (f"Alt for {navn}, inkl. korrelationer", f"api/{per}.json"),
-        ("Oversigt over halvår, aktivklasser, horisonter og nøgletal", "index.json"),
-        ("OpenAPI 3.1-skema", "openapi.json"),
-    ]
-    e = html.escape
-    return "".join(
-        f"<li>{e(text)}<br><a href='{e(path)}'>{e(BASE_URL)}/{e(path)}</a></li>"
-        for text, path in items)
-
-
 BASE_URL = "https://simontjell.github.io/afkastforventninger"
 
 
@@ -372,9 +315,23 @@ def openapi(index: dict) -> dict:
         ("/api/latest", "Latest", f" Nyeste offentliggjorte halvår (p.t. {index['latest']}).", []),
         ("/api/current", "Current", f" Halvåret, der gælder i dag (p.t. {index['current']}).", []),
     ]
-    paths: dict = {"/index.json": {"get": {
-        "operationId": "getIndex", "summary": "Halvår, aktivklasser, horisonter og nøgletal.",
-        "responses": obj("Oversigt.")}}}
+    paths: dict = {
+        "/index.json": {"get": {
+            "operationId": "getIndex", "summary": "Halvår, aktivklasser, horisonter og nøgletal.",
+            "responses": obj("Oversigt.")}},
+        "/api.json": {"get": {
+            "operationId": "getAlt", "summary": "Roden i træet: alle halvår samt latest og current.",
+            "responses": obj("latest, current og hvert år -> halvår -> hele halvåret.")}},
+        "/api/{aar}.json": {"get": {
+            "operationId": "getAar", "summary": "Begge halvår for et år.",
+            "parameters": [ref("aar")], "responses": obj("h1/h2 -> hele halvåret.")}},
+    }
+    numbers = {"type": "object", "additionalProperties": {"type": "number"}}
+    nested = {"type": "object", "additionalProperties": {"oneOf": [{"type": "number"}, numbers]}}
+
+    def folder(desc: str, schema: dict) -> dict:
+        return {"200": {"description": desc, "content": {"application/json": {"schema": schema}}},
+                "404": {"description": "Findes ikke."}}
     for prefix, op, note, pp in prefixes:
         paths[f"{prefix}.json"] = {"get": {
             "operationId": f"get{op or 'Halvaar'}" + ("" if not op else "Halvaar"),
@@ -388,6 +345,22 @@ def openapi(index: dict) -> dict:
             "responses": {"200": {"description": "Horisont -> inflation.", "content": {"application/json": {
                 "schema": {"type": "object", "additionalProperties": {"type": "number"}},
                 "example": {"1-5": 0.018, "6-10": 0.018, "1-10": 0.018, "11-plus": 0.02}}}}}}}
+        # Mapperne som .json. Horisonter og nøgletal står som faste stier, fordi de ellers
+        # ville være tvetydige med {aktivklasse} på samme niveau.
+        for hz in index["horisonter"]:
+            hz_id = hz.replace("-", " ").title().replace(" ", "")
+            paths[f"{prefix}/{hz}.json"] = {"get": {
+                "operationId": f"get{op}Horisont{hz_id}",
+                "summary": f"Alt på horisonten {hz}: afkast pr. aktivklasse og hvert nøgletal." + note,
+                "parameters": [ref(x) for x in pp],
+                "responses": folder("Aktivklasse -> afkast, og nøgletal -> aktivklasse -> værdi.", nested)}}
+        for metric in index["noegletal"]:
+            m_id = metric.replace("-", " ").title().replace(" ", "")
+            paths[f"{prefix}/{{horisont}}/{metric}.json"] = {"get": {
+                "operationId": f"get{op}Alle{m_id}",
+                "summary": f"{LABELS.get(metric, metric).capitalize()} for alle aktivklasser på en horisont." + note,
+                "parameters": [ref(x) for x in pp + ["horisont"]],
+                "responses": folder("Aktivklasse -> værdi.", numbers)}}
         for tail, name, summary, tp in values:
             paths[f"{prefix}/{tail}.json"] = {"get": {
                 "operationId": f"get{op}{name}", "summary": summary + note,
@@ -399,9 +372,9 @@ def openapi(index: dict) -> dict:
             "version": index["latest"],
             "description": (
                 "Uofficielt, statisk API med tallene fra Rådet for Afkastforventninger "
-                "(https://afkastforventninger.dk/afkastforventninger). Hver adresse svarer med "
-                "ét decimaltal (fx 0.067). Skemaet beskriver .json-adresserne, som har Content-Type "
-                "application/json. En mappe afsluttet med / giver en HTML-oversigt med links. Kun GET."),
+"(https://afkastforventninger.dk/afkastforventninger). API'et er et træ: hver knude har "
+                "en .json-adresse. Et blad svarer med ét decimaltal (fx 0.067 = 6,7 %), en mappe med alt "
+                "under sig. Hele træet kan ses på /api/. Content-Type er application/json. Kun GET."),
         },
         "servers": [{"url": BASE_URL}],
         "paths": paths,
@@ -410,50 +383,28 @@ def openapi(index: dict) -> dict:
 
 
 INDEX_CSS = """
-:root{--bg:#fbfbfa;--fg:#1c1c1a;--muted:#6f6f6a;--line:#e6e5e1;--hover:#f1f0ec;--link:#0b57a4;--pill:#eeede9;
---accent:#12325a;--code:#f3f2ee;--c:#7a7a74;--v:#0b57a4;--p:#a23b2a}
-@media(prefers-color-scheme:dark){:root{--bg:#141414;--fg:#e8e6e1;--muted:#9a9891;--line:#2a2a28;--hover:#1e1e1c;--link:#8ab4f8;--pill:#262624;
---accent:#8ab4f8;--code:#1c1c1a;--c:#8b8a84;--v:#8ab4f8;--p:#e39a8c}}
+:root{--bg:#fbfbfa;--fg:#1c1c1a;--muted:#6f6f6a;--line:#e6e5e1;--link:#0b57a4;--accent:#12325a;--on:#fff;--code:#f3f2ee}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--fg:#e8e6e1;--muted:#9a9891;--line:#2a2a28;--link:#8ab4f8;--accent:#8ab4f8;--on:#141414;--code:#1c1c1a}}
 *{box-sizing:border-box}
 html{border-top:4px solid var(--accent)}
-body{font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:52rem;margin:0 auto;padding:3rem 1rem 4rem;color:var(--fg);background:var(--bg)}
+body{font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:40rem;margin:0 auto;padding:4.5rem 1rem 4rem;color:var(--fg);background:var(--bg)}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
-header{padding-bottom:2rem;border-bottom:1px solid var(--line)}
 .over{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem}
-h1{font:400 2.5rem/1.15 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;letter-spacing:-.01em;margin:0 0 1rem;color:var(--accent)}
-.lead{max-width:40rem;margin:0 0 .5rem}
+h1{font:400 2.75rem/1.15 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;letter-spacing:-.01em;margin:0 0 1.25rem;color:var(--accent)}
+.lead{margin:0 0 .5rem}
 .by{color:var(--muted);font-size:.9rem;margin:0}
-nav{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;margin-top:1.5rem;font-size:.95rem}
+nav{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.5rem;margin:2.25rem 0 0;font-size:.95rem}
 nav a{font-weight:600}
-section{padding:2.25rem 0 0}
-h2{font:400 1.45rem/1.25 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;margin:0 0 .25rem;color:var(--accent)}
-.note{color:var(--muted);font-size:.9rem;margin:0 0 1rem;max-width:40rem}
-.scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.95rem}
-th{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;
-padding:.5rem .75rem;border-bottom:1px solid var(--fg);white-space:nowrap}
-td{padding:.5rem .75rem;border-bottom:1px solid var(--line);vertical-align:baseline}
-th:first-child,td:first-child{padding-left:0}th:last-child,td:last-child{padding-right:0}
-th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.n a{color:inherit}
-tbody tr:hover{background:var(--hover)}
-tfoot td{border-top:1px solid var(--fg);border-bottom:0;color:var(--muted)}
-code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em}
-code{background:var(--code);padding:.1em .35em;border-radius:3px}
-td code{white-space:nowrap}
-pre{background:var(--code);border:1px solid var(--line);border-radius:4px;padding:1rem;overflow-x:auto;font:10px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0}
-.c{color:var(--c);font-style:italic}.v{color:var(--v)}.p{color:var(--p)}
-.ex{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
-.ex li{padding:.6rem 0;border-bottom:1px solid var(--line)}
-.ex br{display:none}
-.ex a{display:block;font:.8rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere;margin-top:.1rem}
-.ref td:first-child{width:21rem}
-@media(max-width:40rem){h1{font-size:2rem}body{padding-top:2rem}table{font-size:.82rem}th,td{padding:.45rem .22rem}th{letter-spacing:0;font-size:.62rem}.ref td:first-child{width:auto}}
-h3{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:1.5rem 0 0}
-footer{margin-top:3rem;padding-top:1.25rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
-footer p{margin:0 0 .35rem;max-width:44rem}
+nav a.primary{background:var(--accent);color:var(--on);padding:.6rem 1.15rem;border-radius:4px}
+nav a.primary:hover{text-decoration:none;opacity:.9}
+.ex{margin:2.75rem 0 0;padding-top:1.5rem;border-top:1px solid var(--line)}
+.ex p{margin:0 0 .4rem;color:var(--muted);font-size:.9rem}
+.ex a{font:.85rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.ex code{font:600 .85rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:.1em .4em;border-radius:3px;white-space:nowrap}
+footer{margin-top:3.5rem;padding-top:1.25rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+footer p{margin:0}
+@media(max-width:34rem){h1{font-size:2.1rem}body{padding-top:2.5rem}}
 """
-
 
 FAVICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 <rect width="64" height="64" rx="12" fill="#12325a"/>
@@ -463,111 +414,29 @@ FAVICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 """
 
 
-def pct(v: float) -> str:
-    return f"{v * 100:.1f}".replace(".", ",")
-
-
 def index_html(index: dict, cur: dict) -> str:
+    """Forsiden: kort præsentation og vej ind til træet på /api/, som er dokumentationen."""
     e = html.escape
-    navn = f"{cur['halvaar']}. halvår {cur['aar']}"
-    hs = cur["horisonter"]
-
-    def cell(path: str, v) -> str:
-        if v is None:
-            return "<td class=n></td>"
-        return f"<td class=n><a href='api/current/{e(path)}.json' title='{fmt(v)}'>{pct(v)}</a></td>"
-
-    main_rows = "".join(
-        f"<tr><td>{e(a['navn'])}</td>"
-        + "".join(cell(f"{h}/{slug}", hs[h]["aktivklasser"][slug]["afkast"]) for h in ("1-5", "6-10", "1-10"))
-        + cell(f"1-10/standardafvigelse/{slug}", a.get("standardafvigelse")) + "</tr>"
-        for slug, a in hs["1-10"]["aktivklasser"].items())
-    infl = cur["inflation"]
-    infl_row = ("<tr><td>Inflation</td>"
-                + "".join(cell(f"inflation/{h}", infl.get(h)) for h in ("1-5", "6-10", "1-10"))
-                + "<td class=n></td></tr>")
-    long_rows = "".join(
-        f"<tr><td>{e(a['navn'])}</td>" + cell(f"11-plus/{slug}", a["afkast"])
-        + cell(f"11-plus/standardafvigelse/{slug}", a.get("standardafvigelse")) + "</tr>"
-        for slug, a in hs["11-plus"]["aktivklasser"].items())
-    long_rows += f"<tr><td>Inflation</td>{cell('inflation/11-plus', infl.get('11-plus'))}<td class=n></td></tr>"
-
-    def ref(items) -> str:
-        return "".join(f"<tr><td><code>{e(s)}</code></td><td>{e(n)}</td></tr>" for s, n in items)
-
-    assets = ref(list(index["aktivklasser"].items()) + list(index["aktivklasser_11_plus"].items()))
-    horizons = ref((h, LABELS.get(h, h)) for h in index["horisonter"])
-    metrics = ref((m, LABELS.get(m, m)) for m in index["noegletal"])
-    periods = "".join(
-        f"<tr><td>{p['halvaar']}. halvår {p['aar']}</td>"
-        f"<td><a class=mono href='api/{p['aar']}/h{p['halvaar']}/'>api/{p['aar']}/h{p['halvaar']}/</a></td>"
-        f"<td><a class=mono href='api/{p['aar']}/h{p['halvaar']}.json'>.json</a></td>"
-        f"<td><a href='{e(p['kilde'])}'>Rådets regneark</a></td></tr>"
-        for p in reversed(index["perioder"]))
-    examples = examples_html(index)
-    patterns = patterns_html(index)
+    slug = "globale-aktier-developed-markets"
+    a = cur["horisonter"][DEFAULT_HORIZON]["aktivklasser"][slug]
+    path = f"api/current/{slug}.json"
     return f"""<!doctype html>
 <html lang="da"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Afkastforventninger – API</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>{INDEX_CSS}</style>
-<header>
 <p class="over">Uofficielt API</p>
 <h1>Afkastforventninger</h1>
 <p class="lead">Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Dette er et uofficielt API (uden lovning om korrekthed) lavet på baggrund af rådets Excel-ark (som stadig er den officielle kilde).</p>
 <p class="by">Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
-<nav><a href="api/">API-oversigt</a><a href="openapi.json">OpenAPI-skema</a><a href="index.json">index.json</a>
+<nav><a class="primary" href="api/">Åbn API-træet</a><a href="openapi.json">OpenAPI-skema</a>
 <a href="https://github.com/simontjell/afkastforventninger">Kildekode</a></nav>
-</header>
-
-<section>
-<h2>Gældende forventninger</h2>
-<p class="note">{e(navn)}. Forventet årligt afkast og standardafvigelse i pct. Hvert tal linker til sin adresse i API'et.</p>
-<div class="scroll"><table>
-<thead><tr><th>Aktivklasse</th><th class=n>År 1-5</th><th class=n>År 6-10</th><th class=n>År 1-10</th><th class=n>Std.afv.</th></tr></thead>
-<tbody>{main_rows}</tbody>
-<tfoot>{infl_row}</tfoot>
-</table></div>
-<h3>År 11 og frem</h3>
-<div class="scroll"><table>
-<thead><tr><th>Aktivklasse</th><th class=n>Afkast</th><th class=n>Std.afv.</th></tr></thead>
-<tbody>{long_rows}</tbody>
-</table></div>
-</section>
-
-<section>
-<h2>Adresser</h2>
-<p class="note">Svaret er tallet alene (<code>0.067</code> = 6,7 %). Alle data er JSON med <code>application/json</code>. En mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
-<pre>{patterns}</pre>
-</section>
-
-<section>
-<h2>Eksempler</h2>
-<ul class="ex">{examples}</ul>
-</section>
-
-<section>
-<h2>Reference</h2>
-<div class="ref">
-<h3>Aktivklasser</h3><div class="scroll"><table><tbody>{assets}</tbody></table></div>
-<h3>Horisonter</h3><div class="scroll"><table><tbody>{horizons}</tbody></table></div>
-<h3>Nøgletal</h3><div class="scroll"><table><tbody>{metrics}</tbody></table></div>
+<div class="ex">
+<p>Eksempel: {e(a['navn'])}, år {e(DEFAULT_HORIZON)}, {cur['halvaar']}. halvår {cur['aar']}</p>
+<a href="{e(path)}">{e(BASE_URL)}/{e(path)}</a> → <code>{fmt(a['afkast'])}</code>
 </div>
-</section>
-
-<section>
-<h2>Halvår</h2>
-<div class="scroll"><table>
-<thead><tr><th>Halvår</th><th>Oversigt</th><th>Alt</th><th>Kilde</th></tr></thead>
-<tbody>{periods}</tbody>
-</table></div>
-</section>
-
-<footer>
-<p>Uofficielt API uden lovning om korrekthed. Rådets regneark er den officielle kilde.</p>
-<p>Data opdateres dagligt fra afkastforventninger.dk. Senest bygget {e(index['bygget'][:16].replace('T', ' '))} UTC.</p>
-</footer>
+<footer><p>Data opdateres dagligt fra afkastforventninger.dk. Senest bygget {e(index['bygget'][:16].replace('T', ' '))} UTC.</p></footer>
 </html>
 """
 
