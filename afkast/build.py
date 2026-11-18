@@ -14,7 +14,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from .parse import DEFAULT_HORIZON, HORIZONS, parse_workbook
+from .parse import DEFAULT_HORIZON, parse_workbook
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "kilder"
@@ -92,106 +92,32 @@ def patterns_html(index: dict) -> str:
     return "\n\n".join(out)
 
 
-def path_tree(data: dict, latest: str, current: str) -> dict:
-    """Alle gyldige stier som et træ til URL-byggeren på forsiden.
 
-    Bladene er None. Halvår med helt ens stier deler ét undertræ ("former"),
-    som der henvises til med et indeks.
-    """
-    shapes: list[dict] = []
-    keys: list[str] = []
-
-    def order(item):
-        name, child = item
-        if name in HORIZONS:
-            return (0, HORIZONS.index(name), name)
-        return (1 if child is not None else 2, 0, name)
-
-    def sort(node):
-        return {k: (sort(v) if v is not None else None)
-                for k, v in sorted(node.items(), key=order)}
-
-    def shape(d: dict) -> int:
-        tree: dict = {}
-        for path in endpoints(d):
-            node = tree
-            *dirs, leaf = path.split("/")
-            for seg in dirs:
-                node = node.setdefault(seg, {})
-            node[leaf] = None
-        tree = {**sort(tree), ".json": None}
-        key = json.dumps(tree, sort_keys=True)
-        if key not in keys:
-            keys.append(key)
-            shapes.append(tree)
-        return keys.index(key)
-
-    root: dict = {"latest": shape(data[latest]), "current": shape(data[current])}
-    for k in sorted(data, reverse=True):
-        d = data[k]
-        root.setdefault(str(d["aar"]), {})[f"h{d['halvaar']}"] = shape(d)
-    for year in root.values():
-        if isinstance(year, dict):
-            year.update(sorted(year.items()))
-    return {"rod": root, "former": shapes}
-
-
-BUILDER_JS = r"""
-(function () {
-  var T = JSON.parse(document.getElementById('stier').textContent);
-  var row = document.getElementById('byg'), out = document.getElementById('url'),
-      val = document.getElementById('svar');
-  var base = new URL('.', location.href).href;
-  var want = ['latest', 'globale-aktier-developed-markets'], fmt = '';
-  var labels = {'.json': 'alt (.json)'};
-  function node(n) { return typeof n === 'number' ? T.former[n] : n; }
-  function sel(options, value, onchange, plain) {
-    var s = document.createElement('select');
-    options.forEach(function (o) {
-      var e = document.createElement('option');
-      e.value = o; e.textContent = plain ? (o || '(ingen endelse)') : (labels[o] || o);
-      s.appendChild(e);
-    });
-    s.value = value; s.onchange = onchange;
-    // bredde efter det valgte, ikke efter længste mulighed, så rækken kan stå på én linje
-    s.style.width = (s.options[s.selectedIndex].text.length + 3.5) + 'ch';
-    return s;
-  }
-  function sep(t) {
-    var e = document.createElement('span'); e.className = 'p'; e.textContent = t;
-    return e;
-  }
-  function render() {
-    row.textContent = '';
-    var n = T.rod, path = [], depth = 0;
-    while (n) {
-      var keys = Object.keys(n);
-      var pick = keys.indexOf(want[depth]) >= 0 ? want[depth]
-               : keys.indexOf('globale-aktier-developed-markets') >= 0
-                 ? 'globale-aktier-developed-markets' : keys[0];
-      want[depth] = pick;
-      if (pick !== '.json') row.appendChild(sep('/'));
-      row.appendChild(sel(keys, pick, (function (d) {
-        return function () { want[d] = this.value; render(); };
-      })(depth)));
-      path.push(pick);
-      n = node(n[pick]); depth++;
-    }
-    want.length = depth;
-    var whole = path[path.length - 1] === '.json';
-    if (whole) path.pop();
-    else row.appendChild(sel(['', '.txt', '.json'], fmt,
-      function () { fmt = this.value; render(); }, true));
-    var rel = path.join('/') + (whole ? '.json' : fmt);
-    out.href = rel; out.textContent = base + rel;
-    val.textContent = '';
-    if (!whole) fetch(path.join('/') + '.txt').then(function (r) { return r.ok ? r.text() : ''; })
-      .then(function (t) { if (out.getAttribute('href') === rel && t) val.textContent = '→ ' + t.trim(); })
-      .catch(function () {});
-  }
-  render();
-})();
-"""
+def examples_html(index: dict) -> str:
+    """Punktliste med eksempler: beskrivelse efterfulgt af link, der viser adressen."""
+    y, h = index["latest"].split("-")
+    per = f"{y}/{h}"
+    navn = f"{h[1]}. halvår {y}"
+    items = [
+        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"{per}/globale-aktier-developed-markets"),
+        (f"Samme, men på horisonten 1-5 år", f"{per}/1-5/globale-aktier-developed-markets"),
+        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"{per}/6-10/standardafvigelse/hedgefonde"),
+        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"{per}/1-10/fees-i-fonde/private-equity"),
+        (f"Afkast på aktier fra år 11 og frem, {navn}", f"{per}/11-plus/aktier"),
+        (f"Inflationsforventning, 1-5 år, {navn}", f"{per}/inflation/1-5"),
+        (f"Horisontafkast, {navn}", f"{per}/horisontafkast"),
+        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "latest/ejendomme"),
+        ("Afkast på ejendomme i det halvår, der gælder i dag", "current/ejendomme"),
+        ("Samme som ren tekst", "current/ejendomme.txt"),
+        ("Samme som JSON", "current/ejendomme.json"),
+        (f"Alt for {navn}, inkl. korrelationer", f"{per}.json"),
+        ("Oversigt over halvår, aktivklasser, horisonter og nøgletal", "index.json"),
+        ("OpenAPI 3.1-skema", "openapi.json"),
+    ]
+    e = html.escape
+    return "".join(
+        f"<li>{e(text)}<br><a href='{e(path)}'>{e(BASE_URL)}/{e(path)}</a></li>"
+        for text, path in items)
 
 
 BASE_URL = "https://simontjell.github.io/afkastforventninger"
@@ -270,7 +196,7 @@ def openapi(index: dict) -> dict:
     }
 
 
-def index_html(index: dict, tree: dict) -> str:
+def index_html(index: dict) -> str:
     e = html.escape
     rows = "".join(
         f"<tr><td><a href='{p['aar']}/h{p['halvaar']}.json'>{p['aar']} h{p['halvaar']}</a></td>"
@@ -278,27 +204,22 @@ def index_html(index: dict, tree: dict) -> str:
     assets = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser"].items())
     long_ = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser_11_plus"].items())
     metrics = "".join(f"<li><code>{e(m)}</code></li>" for m in index["noegletal"])
-    stier = json.dumps(tree, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    examples = examples_html(index)
     patterns = patterns_html(index)
     return f"""<!doctype html>
 <html lang="da"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Afkastforventninger – API</title>
 <style>body{{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}}
 code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.8em;overflow-x:auto;font-size:10px}}
-.byg{{background:#f3f3f3;padding:.6em .8em;border-radius:3px;display:flex;flex-wrap:nowrap;align-items:center;gap:.2em;font:11px ui-monospace,monospace;overflow-x:auto}}
-.byg select{{font:inherit;padding:.15em 0;flex:0 1 auto;min-width:3.2em;text-overflow:ellipsis;color:inherit;background:#fff;border:1px solid #bbb;border-radius:3px}}
-.res{{font:13px ui-monospace,monospace;overflow-wrap:anywhere}}#svar{{font-weight:600;white-space:nowrap}}
+.ex{{padding-left:1.2em}}.ex li{{margin:.5em 0}}.ex a{{font:12px ui-monospace,monospace;overflow-wrap:anywhere}}
 .c{{color:#6a737d;font-style:italic}}.v{{color:#0550ae}}.p{{color:#cf222e}}
-td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre,.byg{{background:#262626}}.byg select{{background:#161616;border-color:#555}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
+td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre{{background:#262626}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
 <h1>Afkastforventninger som API</h1>
 <p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
-<h2>Byg en adresse</h2>
-<div id="byg" class="byg"></div>
-<p class="res"><a id="url" href="."></a> <span id="svar"></span></p>
-<p>Uden endelse er svaret <code>text/html</code>; <code>.txt</code> og <code>.json</code> giver en anden content-type.</p>
-<script type="application/json" id="stier">{stier}</script>
-<script>{BUILDER_JS}</script>
+<h2>Eksempler</h2>
+<ul class="ex">{examples}</ul>
+<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Uden endelse er det <code>text/html</code>; <code>.txt</code> og <code>.json</code> giver en anden content-type.</p>
 <h2>Mønstre</h2>
 <pre>{patterns}</pre>
 <p>Maskinlæsbar beskrivelse: <a href="openapi.json">openapi.json</a> (OpenAPI 3.1).</p>
@@ -353,7 +274,7 @@ def main() -> int:
     }
     (SITE / "openapi.json").write_text(json.dumps(openapi(index), indent=2, ensure_ascii=False) + "\n")
     (SITE / "index.json").write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n")
-    (SITE / "index.html").write_text(index_html(index, path_tree(data, latest, current)))
+    (SITE / "index.html").write_text(index_html(index))
     (SITE / "404.html").write_text(
         "<!doctype html><meta charset=utf-8><title>404</title>"
         "<p>Ukendt sti. Se <a href='/afkastforventninger/'>oversigten</a>.</p>\n")
