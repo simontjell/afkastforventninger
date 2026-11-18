@@ -147,6 +147,87 @@ def listing_html(folder: Path, node: dict) -> str:
         f"<ul class=list>{''.join(rows)}</ul>\n</html>\n")
 
 
+TREE_CSS = """
+.tools{display:flex;gap:.5rem;margin:0 0 1rem}
+.tools button{font:inherit;font-size:.8rem;color:var(--muted);background:var(--pill);border:0;border-radius:999px;padding:.25rem .8rem;cursor:pointer}
+.tools button:hover{color:var(--link)}
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree{border-top:1px solid var(--line)}
+.tree ul{margin-left:.6rem;padding-left:.9rem;border-left:1px solid var(--line)}
+.tree>li{border-bottom:1px solid var(--line)}
+.tree .row{display:flex;align-items:baseline;gap:.75rem;padding:.38rem .4rem;border-radius:3px}
+.tree .row:hover{background:var(--hover)}
+.tree summary{list-style:none;cursor:pointer}
+.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:"\\25B8";color:var(--muted);width:.9em;flex:none;display:inline-block;text-align:center;line-height:1;align-self:center;transition:transform .12s}
+.tree details[open]>summary::before{transform:rotate(90deg)}
+.tree li>.row:not(summary){padding-left:calc(.4rem + .9em + .75rem)}
+.tree .name{font:500 .9rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap}
+.tree .label{color:var(--muted);font-size:.82rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree .val{font:600 .9rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tree .pct{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap;width:4.2em;text-align:right}
+@media(max-width:34rem){.tree ul{margin-left:.25rem;padding-left:.5rem}.tree .label,.tree .pct{display:none}.tree .name{white-space:normal;overflow-wrap:break-word;min-width:0;flex:1}}
+"""
+
+TREE_JS = """
+document.querySelectorAll('.tools button').forEach(function (b) {
+  b.onclick = function () {
+    var open = b.dataset.open === '1';
+    document.querySelectorAll('.tree details').forEach(function (d) { d.open = open; });
+  };
+});
+"""
+
+
+def ordered(node: dict, top_level: bool = False) -> list[str]:
+    """Mapper først (horisonter i naturlig rækkefølge), derefter tallene."""
+    hz = {"1-5": 0, "6-10": 1, "1-10": 2, "11-plus": 3}
+    top = {"latest": 0, "current": 1}
+    folders = [k for k, v in node.items() if isinstance(v, dict)]
+    if top_level:
+        folders.sort(key=lambda k: (top.get(k, 2), -int(k) if k.isdigit() else 0))
+    else:
+        folders.sort(key=lambda k: (hz.get(k, 9), k))
+    return folders + [k for k, v in node.items() if not isinstance(v, dict)]
+
+
+def tree_html(tree: dict) -> str:
+    """Siden /api/: hele API'et som ét træ, hvor hver knude linker til sin .json."""
+    e = html.escape
+
+    def render(node: dict, prefix: str, depth: int) -> str:
+        out = []
+        for name in ordered(node, top_level=depth == 0):
+            child = node[name]
+            href = f"{prefix}{name}.json"
+            link = f"<a class=name href='{e(href)}'>{e(name)}.json</a>"
+            label = f"<span class=label>{e(LABELS.get(name, ''))}</span>"
+            if isinstance(child, dict):
+                is_open = " open" if (depth == 0 and name == "current") else ""
+                out.append(f"<li><details{is_open}><summary class=row>{link}{label}</summary>"
+                           f"<ul>{render(child, f'{prefix}{name}/', depth + 1)}</ul></details></li>")
+            else:
+                p = f"{child * 100:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+                out.append(f"<li><div class=row>{link}{label}<span class=val>{fmt(child)}</span>"
+                           f"<span class=pct>{p} %</span></div></li>")
+        return "".join(out)
+
+    return (
+        "<!doctype html>\n<html lang=\"da\"><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+        "<title>afkastforventninger/api</title>\n"
+        "<link rel=\"icon\" href=\"../favicon.svg\" type=\"image/svg+xml\">\n"
+        f"<style>{PAGE_CSS}{TREE_CSS}</style>\n"
+        "<h1 class=crumbs><a href='../'>afkastforventninger</a><span class=sep>/</span>"
+        "<span class=here>api</span></h1>\n"
+        "<p class=sub>Hele API'et som træ. Hver knude linker til sin JSON.</p>\n"
+        "<div class=tools><button data-open=1>Fold alt ud</button><button data-open=0>Fold alt ind</button></div>\n"
+        "<ul class=tree><li><details open><summary class=row>"
+        "<a class=name href='../api.json'>api.json</a><span class=label>alle halvår</span></summary>"
+        f"<ul>{render(tree, '', 0)}</ul></details></li></ul>\n"
+        f"<script>{TREE_JS}</script>\n</html>\n")
+
+
 def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
     """Det generelle mønster for en mappe X:
 
@@ -166,7 +247,7 @@ def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
             (folder / f"{name}.json").write_text(fmt(child) + "\n")
 
 
-def write_period(base: Path, d: dict) -> int:
+def write_period(base: Path, d: dict) -> dict:
     eps = endpoints(d)
     tree: dict = {}
     for rel, v in eps.items():
@@ -179,7 +260,7 @@ def write_period(base: Path, d: dict) -> int:
     write_tree(base, tree, own_json=False)
     base.with_name(base.name + ".json").write_text(
         json.dumps(d, indent=2, ensure_ascii=False) + "\n")
-    return len(eps)
+    return tree
 
 
 def current_period(periods: list[str], today: dt.date) -> str:
@@ -514,10 +595,16 @@ def main() -> int:
             for slug, a in h["aktivklasser"].items():
                 LABELS[slug] = a["navn"]
         LABELS[str(d["aar"])] = f"forventninger for {d['aar']}"
-    for key, d in data.items():
-        n += write_period(API / str(d["aar"]) / f"h{d['halvaar']}", d)
-    write_period(API / "latest", data[latest])
-    write_period(API / "current", data[current])
+    trees = {key: write_period(API / str(d["aar"]) / f"h{d['halvaar']}", d) for key, d in data.items()}
+    n = sum(len(endpoints(d)) for d in data.values())
+    full: dict = {"latest": write_period(API / "latest", data[latest]),
+                  "current": write_period(API / "current", data[current])}
+    for key in sorted(data, reverse=True):
+        full.setdefault(str(data[key]["aar"]), {})[f"h{data[key]['halvaar']}"] = trees[key]
+    for value in full.values():
+        if "h1" in value or "h2" in value:
+            ordered_halves = dict(sorted(value.items()))
+            value.clear(); value.update(ordered_halves)
 
     # Niveauerne over halvårene følger samme mønster: X/ er en oversigt, X.json er alt under X.
     def dump(path: Path, obj) -> None:
@@ -531,7 +618,7 @@ def main() -> int:
         (API / str(year) / "index.html").write_text(
             listing_html(API / str(year), {h: {} for h in halves}))
         dump(API / f"{year}.json", halves)
-    (API / "index.html").write_text(listing_html(API, {k: {} for k in everything}))
+    (API / "index.html").write_text(tree_html(full))
     dump(SITE / "api.json", everything)
 
     names, long_names, metrics = {}, {}, []
