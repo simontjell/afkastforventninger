@@ -153,6 +153,8 @@ BUILDER_JS = r"""
       s.appendChild(e);
     });
     s.value = value; s.onchange = onchange;
+    // bredde efter det valgte, ikke efter længste mulighed, så rækken kan stå på én linje
+    s.style.width = (s.options[s.selectedIndex].text.length + 3.5) + 'ch';
     return s;
   }
   function sep(t) {
@@ -283,8 +285,8 @@ def index_html(index: dict, tree: dict) -> str:
 <title>Afkastforventninger – API</title>
 <style>body{{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}}
 code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.8em;overflow-x:auto;font-size:10px}}
-.byg{{background:#f3f3f3;padding:.6em .8em;border-radius:3px;display:flex;flex-wrap:wrap;align-items:center;gap:.25em;font:13px ui-monospace,monospace}}
-.byg select{{font:inherit;padding:.15em .2em;max-width:100%;color:inherit;background:#fff;border:1px solid #bbb;border-radius:3px}}
+.byg{{background:#f3f3f3;padding:.6em .8em;border-radius:3px;display:flex;flex-wrap:nowrap;align-items:center;gap:.2em;font:11px ui-monospace,monospace;overflow-x:auto}}
+.byg select{{font:inherit;padding:.15em 0;flex:0 1 auto;min-width:3.2em;text-overflow:ellipsis;color:inherit;background:#fff;border:1px solid #bbb;border-radius:3px}}
 .res{{font:13px ui-monospace,monospace;overflow-wrap:anywhere}}#svar{{font-weight:600;white-space:nowrap}}
 .c{{color:#6a737d;font-style:italic}}.v{{color:#0550ae}}.p{{color:#cf222e}}
 td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre,.byg{{background:#262626}}.byg select{{background:#161616;border-color:#555}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
