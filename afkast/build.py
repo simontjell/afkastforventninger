@@ -87,14 +87,31 @@ td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background
 <h1>Afkastforventninger som API</h1>
 <p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
-<pre>/{{år}}/h{{1|2}}/{{aktivklasse}}                       afkast, {DEFAULT_HORIZON} år
-/{{år}}/h{{1|2}}/{{horisont}}/{{aktivklasse}}            afkast
+<pre># afkast, {DEFAULT_HORIZON} år
+/{{år}}/h{{1|2}}/{{aktivklasse}}
+
+# afkast for en bestemt horisont
+/{{år}}/h{{1|2}}/{{horisont}}/{{aktivklasse}}
+
+# et bestemt nøgletal
 /{{år}}/h{{1|2}}/{{horisont}}/{{nøgletal}}/{{aktivklasse}}
+
+# inflationsforventning
 /{{år}}/h{{1|2}}/inflation/{{horisont}}
+
+# horisontafkast
 /{{år}}/h{{1|2}}/horisontafkast
-/{{år}}/h{{1|2}}.json                                alt for halvåret
-/latest/…   nyeste offentliggjorte ({e(index['latest'])})
-/current/…  gældende i dag ({e(index['current'])})
+
+# alt for halvåret, inkl. korrelationer
+/{{år}}/h{{1|2}}.json
+
+# nyeste offentliggjorte ({e(index['latest'])})
+/latest/…
+
+# gældende i dag ({e(index['current'])})
+/current/…
+
+# halvår, aktivklasser, horisonter og nøgletal
 /index.json</pre>
 <p>Eksempel: <a href="{y}/h{h}/globale-aktier-developed-markets"><code>{y}/h{h}/globale-aktier-developed-markets</code></a> → <code>{v}</code>.
 Tilføj <code>.txt</code> eller <code>.json</code> for en anden content-type.</p>
