@@ -22,6 +22,7 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 | `/latest/…` | nyeste offentliggjorte halvår |
 | `/current/…` | halvåret, der gælder i dag |
 | `/index.json` | halvår, aktivklasser, horisonter, nøgletal |
+| `/openapi.json` | OpenAPI 3.1-skema for alle adresser |
 
 - **Horisonter:** `1-5`, `6-10`, `1-10`, `11-plus`
 - **Aktivklasser:** `stats-og-realkreditobligationer`, `investment-grade-obligationer`,
