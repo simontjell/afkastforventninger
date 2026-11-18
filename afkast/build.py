@@ -224,7 +224,7 @@ som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.
 <h2>Aktivklasser</h2><ul>{assets}</ul><p>På <code>11-plus</code>:</p><ul>{long_}</ul>
 <h2>Nøgletal</h2><ul>{metrics}</ul>
 <h2>Halvår</h2><table>{rows}</table>
-<p><small>Bygget {e(index['bygget'])}.</small></p></html>
+<p><small>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>. Bygget {e(index['bygget'])}.</small></p></html>
 """
 
 

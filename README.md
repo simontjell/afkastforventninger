@@ -86,3 +86,5 @@ python -m http.server -d _site
 Under *Settings → Pages* vælges **Source: GitHub Actions**. Derefter udgiver workflowet selv.
 GitHub slår planlagte workflows fra efter 60 dage uden aktivitet i repoet; de slås til igen
 under *Actions*.
+
+Lavet af [Simple Systemer](https://simplesystemer.dk).
