@@ -1,8 +1,7 @@
 """Bygger det statiske API i _site/ ud fra regnearkene i kilder/.
 
-Hvert tal skrives som én fil, <sti>.html, hvis indhold er tallet som JSON.
-GitHub Pages serverer <sti>.html på adressen <sti> (uden endelse og uden
-redirect), så .../2026/h1/globale-aktier-developed-markets svarer med 0.067.
+Hvert tal skrives som <sti>.json, hver mappe som <sti>.json (alt under den)
+og <sti>/index.html (oversigt med links), så .../api/2026/h1/globale-aktier-developed-markets.json svarer med 0.067.
 """
 from __future__ import annotations
 
@@ -130,9 +129,10 @@ def listing_html(folder: Path, node: dict) -> str:
                     f"{label}<span class=go>›</span></a>")
         else:
             pct = f"{child * 100:.2f}".rstrip("0").rstrip(".").replace(".", ",")
-            body = (f"<a class=main href='{e(name)}'><span class=name>{e(name)}</span>"
+            body = (f"<a class=main href='{e(name)}.json'><span class=name>{e(name)}.json</span>"
                     f"{label}<span class=val>{fmt(child)}</span><span class=pct>{pct} %</span></a>")
-        rows.append(f"<li>{body}<a class=json href='{e(name)}.json'>.json</a></li>")
+        pill = f"<a class=json href='{e(name)}.json'>.json</a>" if isinstance(child, dict) else ""
+        rows.append(f"<li>{body}{pill}</li>")
 
     path = "/".join(("afkastforventninger",) + parts)
     return (
@@ -152,7 +152,7 @@ def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
 
       X/        HTML-side med links til det, der ligger direkte under X
       X.json    alle tal under X som JSON (application/json)
-      X/navn    et enkelt tal; X/navn.json er det samme som application/json
+      X/navn.json  et enkelt tal
     """
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "index.html").write_text(listing_html(folder, node))
@@ -163,7 +163,6 @@ def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
         if isinstance(child, dict):
             write_tree(folder / name, child)
         else:
-            (folder / f"{name}.html").write_text(fmt(child))
             (folder / f"{name}.json").write_text(fmt(child) + "\n")
 
 
@@ -191,14 +190,13 @@ def current_period(periods: list[str], today: dt.date) -> str:
 def patterns_html(index: dict) -> str:
     """Stimønstrene med kommentar over hver og simpel syntaksfarvning."""
     items = [
-        (f"afkast, {DEFAULT_HORIZON} år", "/api/{år}/h{1|2}/{aktivklasse}"),
-        ("afkast for en bestemt horisont", "/api/{år}/h{1|2}/{horisont}/{aktivklasse}"),
-        ("et bestemt nøgletal", "/api/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
-        ("inflationsforventning", "/api/{år}/h{1|2}/inflation/{horisont}"),
-        ("ethvert tal som application/json: tilføj .json", "/api/{år}/h{1|2}/{aktivklasse}.json"),
+        (f"afkast, {DEFAULT_HORIZON} år", "/api/{år}/h{1|2}/{aktivklasse}.json"),
+        ("afkast for en bestemt horisont", "/api/{år}/h{1|2}/{horisont}/{aktivklasse}.json"),
+        ("et bestemt nøgletal", "/api/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}.json"),
+        ("inflationsforventning", "/api/{år}/h{1|2}/inflation/{horisont}.json"),
         ("alle tal under en mappe som JSON: mappens navn + .json", "/api/{år}/h{1|2}/inflation.json"),
         ("oversigt med links til det underliggende: afslut med /", "/api/{år}/h{1|2}/inflation/"),
-        ("horisontafkast", "/api/{år}/h{1|2}/horisontafkast"),
+        ("horisontafkast", "/api/{år}/h{1|2}/horisontafkast.json"),
         ("alt for halvåret, inkl. korrelationer", "/api/{år}/h{1|2}.json"),
         (f"nyeste offentliggjorte ({index['latest']})", "/api/latest/…"),
         (f"gældende i dag ({index['current']})", "/api/current/…"),
@@ -223,19 +221,19 @@ def examples_html(index: dict) -> str:
     navn = f"{h[1]}. halvår {y}"
     items = [
         ("Start her: oversigt med links til alle halvår", "api/"),
-        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"api/{per}/globale-aktier-developed-markets"),
-        (f"Samme, men på horisonten 1-5 år", f"api/{per}/1-5/globale-aktier-developed-markets"),
-        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"api/{per}/6-10/standardafvigelse/hedgefonde"),
-        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"api/{per}/1-10/fees-i-fonde/private-equity"),
-        (f"Afkast på aktier fra år 11 og frem, {navn}", f"api/{per}/11-plus/aktier"),
-        (f"Inflationsforventning, 1-5 år, {navn}", f"api/{per}/inflation/1-5"),
-        (f"Inflationsforventning for alle horisonter som JSON, {navn}", f"api/{per}/inflation.json"),
-        (f"Afkast for alle aktivklasser som JSON, 1-5 år, {navn}", f"api/{per}/1-5/afkast.json"),
+        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"api/{per}/globale-aktier-developed-markets.json"),
+        (f"Samme, men på horisonten 1-5 år", f"api/{per}/1-5/globale-aktier-developed-markets.json"),
+        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"api/{per}/6-10/standardafvigelse/hedgefonde.json"),
+        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"api/{per}/1-10/fees-i-fonde/private-equity.json"),
+        (f"Afkast på aktier fra år 11 og frem, {navn}", f"api/{per}/11-plus/aktier.json"),
+        (f"Inflationsforventning, 1-5 år, {navn}", f"api/{per}/inflation/1-5.json"),
+        (f"Inflationsforventning for alle horisonter, {navn}", f"api/{per}/inflation.json"),
+        (f"Afkast for alle aktivklasser, 1-5 år, {navn}", f"api/{per}/1-5/afkast.json"),
         ("Samme tal i det halvår, der gælder i dag", "api/current/1-5/afkast.json"),
         (f"Oversigt med links til alt under {navn}", f"api/{per}/"),
-        (f"Horisontafkast, {navn}", f"api/{per}/horisontafkast"),
-        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "api/latest/ejendomme"),
-        ("Afkast på ejendomme i det halvår, der gælder i dag", "api/current/ejendomme"),
+        (f"Horisontafkast, {navn}", f"api/{per}/horisontafkast.json"),
+        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "api/latest/ejendomme.json"),
+        ("Afkast på ejendomme i det halvår, der gælder i dag", "api/current/ejendomme.json"),
         (f"Alt for {navn}, inkl. korrelationer", f"api/{per}.json"),
         ("Oversigt over halvår, aktivklasser, horisonter og nøgletal", "index.json"),
         ("OpenAPI 3.1-skema", "openapi.json"),
@@ -322,8 +320,7 @@ def openapi(index: dict) -> dict:
                 "Uofficielt, statisk API med tallene fra Rådet for Afkastforventninger "
                 "(https://afkastforventninger.dk/afkastforventninger). Hver adresse svarer med "
                 "ét decimaltal (fx 0.067). Skemaet beskriver .json-adresserne, som har Content-Type "
-                "application/json. Samme adresse uden .json giver tallet som text/html, og en mappe "
-                "afsluttet med / giver en HTML-oversigt med links. Kun GET."),
+                "application/json. En mappe afsluttet med / giver en HTML-oversigt med links. Kun GET."),
         },
         "servers": [{"url": BASE_URL}],
         "paths": paths,
@@ -397,7 +394,7 @@ def index_html(index: dict, cur: dict) -> str:
     def cell(path: str, v) -> str:
         if v is None:
             return "<td class=n></td>"
-        return f"<td class=n><a href='api/current/{e(path)}' title='{fmt(v)}'>{pct(v)}</a></td>"
+        return f"<td class=n><a href='api/current/{e(path)}.json' title='{fmt(v)}'>{pct(v)}</a></td>"
 
     main_rows = "".join(
         f"<tr><td>{e(a['navn'])}</td>"
@@ -460,7 +457,7 @@ som decimaltal på faste adresser. Dette er et uofficielt API (uden lovning om k
 
 <section>
 <h2>Adresser</h2>
-<p class="note">Svaret er tallet alene (<code>0.067</code> = 6,7 %). Tilføj <code>.json</code> til en adresse for <code>application/json</code>. En mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
+<p class="note">Svaret er tallet alene (<code>0.067</code> = 6,7 %). Alle data er JSON med <code>application/json</code>. En mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
 <pre>{patterns}</pre>
 </section>
 

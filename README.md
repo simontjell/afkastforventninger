@@ -4,7 +4,7 @@ Tallene fra [Rådet for Afkastforventninger](https://afkastforventninger.dk/afka
 som decimaltal på faste adresser (GitHub Pages, ingen server).
 
 ```
-https://simontjell.github.io/afkastforventninger/api/2026/h1/globale-aktier-developed-markets  →  0.067
+https://simontjell.github.io/afkastforventninger/api/2026/h1/globale-aktier-developed-markets.json  →  0.067
 ```
 
 Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til det regneark, tallene kommer fra.
@@ -13,14 +13,13 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 
 | Sti | Indhold |
 |---|---|
-| `/api/{år}/h{1\|2}/{aktivklasse}` | afkast, horisont 1-10 år |
-| `/api/{år}/h{1\|2}/{horisont}/{aktivklasse}` | afkast for horisonten |
-| `/api/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}` | et bestemt nøgletal |
-| `/api/{år}/h{1\|2}/inflation/{horisont}` | inflationsforventning |
-| en adresse + `.json` | samme tal som `application/json` |
+| `/api/{år}/h{1\|2}/{aktivklasse}.json` | afkast, horisont 1-10 år |
+| `/api/{år}/h{1\|2}/{horisont}/{aktivklasse}.json` | afkast for horisonten |
+| `/api/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}.json` | et bestemt nøgletal |
+| `/api/{år}/h{1\|2}/inflation/{horisont}.json` | inflationsforventning |
 | en mappe + `.json`, fx `/api/{år}/h{1\|2}/inflation.json` | alle tal under mappen som JSON-objekt |
 | en mappe + `/`, fx `/api/{år}/h{1\|2}/inflation/` | HTML-oversigt med links til det underliggende |
-| `/api/{år}/h{1\|2}/horisontafkast` | horisontafkast (fra 2021 h2) |
+| `/api/{år}/h{1\|2}/horisontafkast.json` | horisontafkast (fra 2021 h2) |
 | `/api/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
 | `/api/latest/…` | nyeste offentliggjorte halvår |
 | `/api/current/…` | halvåret, der gælder i dag |
@@ -37,16 +36,15 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 - **Nøgletal:** `afkast`, `standardafvigelse`, `investeringsomkostninger`, og hvor rådet
   oplyser dem: `fees-i-fonde`, `afkast-unhedged`, `loebende-afkast`, `kursaendring`.
 
-Svaret er tallet alene (`0.067` = 6,7 %). GitHub Pages vælger content-type ud fra endelsen:
-uden endelse er det `text/html`, med `.json` er det `application/json`. Mønsteret gælder på alle
-niveauer: `X.json` er alt under `X` som JSON, og `X/` er en side med links til det underliggende.
+Svaret er tallet alene (`0.067` = 6,7 %) med `Content-Type: application/json`. Mønsteret gælder på
+alle niveauer: `X.json` er alt under `X` som JSON, og `X/` er en side med links til det underliggende.
 
 ```bash
-curl https://simontjell.github.io/afkastforventninger/api/2027/h1/1-5/globale-aktier-developed-markets
+curl https://simontjell.github.io/afkastforventninger/api/2027/h1/1-5/globale-aktier-developed-markets.json
 ```
 
 ```
-=IMPORTDATA("https://simontjell.github.io/afkastforventninger/api/latest/globale-aktier-developed-markets")
+=IMPORTDATA("https://simontjell.github.io/afkastforventninger/api/latest/globale-aktier-developed-markets.json")
 ```
 
 ## Sådan virker det
