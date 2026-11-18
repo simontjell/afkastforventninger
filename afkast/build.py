@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -68,6 +69,29 @@ def current_period(periods: list[str], today: dt.date) -> str:
     return max((p for p in periods if p <= now), default=periods[0])
 
 
+def patterns_html(index: dict) -> str:
+    """Stimønstrene med kommentar over hver og simpel syntaksfarvning."""
+    items = [
+        (f"afkast, {DEFAULT_HORIZON} år", "/{år}/h{1|2}/{aktivklasse}"),
+        ("afkast for en bestemt horisont", "/{år}/h{1|2}/{horisont}/{aktivklasse}"),
+        ("et bestemt nøgletal", "/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
+        ("inflationsforventning", "/{år}/h{1|2}/inflation/{horisont}"),
+        ("horisontafkast", "/{år}/h{1|2}/horisontafkast"),
+        ("alt for halvåret, inkl. korrelationer", "/{år}/h{1|2}.json"),
+        (f"nyeste offentliggjorte ({index['latest']})", "/latest/…"),
+        (f"gældende i dag ({index['current']})", "/current/…"),
+        ("halvår, aktivklasser, horisonter og nøgletal", "/index.json"),
+    ]
+    out = []
+    for comment, pattern in items:
+        p = re.sub(
+            r"(\{[^}]*\})|(/|…|\.json)",
+            lambda m: f"<span class={'v' if m.group(1) else 'p'}>{html.escape(m.group(0))}</span>",
+            pattern)
+        out.append(f"<span class=c># {html.escape(comment)}</span>\n{p}")
+    return "\n\n".join(out)
+
+
 def index_html(index: dict, example: dict) -> str:
     e = html.escape
     rows = "".join(
@@ -78,41 +102,18 @@ def index_html(index: dict, example: dict) -> str:
     metrics = "".join(f"<li><code>{e(m)}</code></li>" for m in index["noegletal"])
     y, h = example["aar"], example["halvaar"]
     v = fmt(example["horisonter"][DEFAULT_HORIZON]["aktivklasser"]["globale-aktier-developed-markets"]["afkast"])
+    patterns = patterns_html(index)
     return f"""<!doctype html>
 <html lang="da"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Afkastforventninger – API</title>
 <style>body{{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}}
-code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.8em;overflow-x:auto}}
-td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre{{background:#262626}}a{{color:#8ab4f8}}}}</style>
+code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.8em;overflow-x:auto;font-size:10px}}
+.c{{color:#6a737d;font-style:italic}}.v{{color:#0550ae}}.p{{color:#cf222e}}
+td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre{{background:#262626}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
 <h1>Afkastforventninger som API</h1>
 <p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
-<pre># afkast, {DEFAULT_HORIZON} år
-/{{år}}/h{{1|2}}/{{aktivklasse}}
-
-# afkast for en bestemt horisont
-/{{år}}/h{{1|2}}/{{horisont}}/{{aktivklasse}}
-
-# et bestemt nøgletal
-/{{år}}/h{{1|2}}/{{horisont}}/{{nøgletal}}/{{aktivklasse}}
-
-# inflationsforventning
-/{{år}}/h{{1|2}}/inflation/{{horisont}}
-
-# horisontafkast
-/{{år}}/h{{1|2}}/horisontafkast
-
-# alt for halvåret, inkl. korrelationer
-/{{år}}/h{{1|2}}.json
-
-# nyeste offentliggjorte ({e(index['latest'])})
-/latest/…
-
-# gældende i dag ({e(index['current'])})
-/current/…
-
-# halvår, aktivklasser, horisonter og nøgletal
-/index.json</pre>
+<pre>{patterns}</pre>
 <p>Eksempel: <a href="{y}/h{h}/globale-aktier-developed-markets"><code>{y}/h{h}/globale-aktier-developed-markets</code></a> → <code>{v}</code>.
 Tilføj <code>.txt</code> eller <code>.json</code> for en anden content-type.</p>
 <h2>Horisonter</h2><p><code>1-5</code>, <code>6-10</code>, <code>1-10</code>, <code>11-plus</code></p>
