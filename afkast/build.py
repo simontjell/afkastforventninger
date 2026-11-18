@@ -51,44 +51,98 @@ def endpoints(d: dict) -> dict[str, float]:
     return out
 
 
-PAGE_CSS = (
-    "body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}"
-    "code{background:#f3f3f3;padding:.1em .3em;border-radius:3px}"
-    "td{padding:.15em 1.2em .15em 0}td.n{text-align:right;font-variant-numeric:tabular-nums}"
-    "@media(prefers-color-scheme:dark){body{background:#161616;color:#ddd}code{background:#262626}a{color:#8ab4f8}}"
-)
+PAGE_CSS = """
+:root{--bg:#fbfbfa;--fg:#1c1c1a;--muted:#6f6f6a;--line:#e6e5e1;--hover:#f1f0ec;--link:#0b57a4;--pill:#eeede9}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--fg:#e8e6e1;--muted:#9a9891;--line:#2a2a28;--hover:#1e1e1c;--link:#8ab4f8;--pill:#262624}}
+*{box-sizing:border-box}
+body{font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:44rem;margin:0 auto;padding:2.5rem 1rem 4rem;color:var(--fg);background:var(--bg)}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.crumbs{font:600 1.35rem/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 .35rem}
+.crumbs a,.crumbs .here{white-space:nowrap}
+.crumbs .sep{color:var(--muted);font-weight:400;margin:0 .3em}
+.crumbs .here{color:var(--fg)}
+.sub{color:var(--muted);font-size:.9rem;margin:0 0 1.75rem}
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.list li{display:flex;align-items:center;gap:.75rem;border-bottom:1px solid var(--line)}
+.list li:hover{background:var(--hover)}
+.list .main{flex:1;min-width:0;display:flex;align-items:baseline;gap:.75rem;padding:.7rem .5rem;color:inherit}
+.list .main:hover{text-decoration:none}
+.list .name{font:500 .95rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--link);white-space:nowrap}
+.list .label{color:var(--muted);font-size:.85rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .val{font:600 .95rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.list .pct{color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums;white-space:nowrap;width:4.2em;text-align:right}
+.list .go{color:var(--muted)}
+.list .json{font:.72rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);background:var(--pill);border-radius:999px;padding:.15rem .55rem;margin-right:.5rem}
+.list .json:hover{color:var(--link);text-decoration:none}
+@media(max-width:34rem){body{padding-top:1.5rem}.crumbs{font-size:1.1rem}.list .main{flex-wrap:wrap;gap:.1rem .75rem}.list .name{flex:1;min-width:0;white-space:normal;overflow-wrap:break-word}.list .label{flex-basis:100%;order:3;white-space:normal}.list .pct{display:none}}
+"""
+
+# Læsbare navne til oversigtssiderne. Aktivklassernes navne fyldes på fra regnearkene i main().
+LABELS: dict[str, str] = {
+    "api": "alle halvår",
+    "latest": "nyeste offentliggjorte halvår",
+    "current": "halvåret, der gælder i dag",
+    "h1": "1. halvår",
+    "h2": "2. halvår",
+    "1-5": "år 1-5",
+    "6-10": "år 6-10",
+    "1-10": "år 1-10",
+    "11-plus": "år 11 og frem",
+    "afkast": "forventet afkast",
+    "standardafvigelse": "standardafvigelse",
+    "investeringsomkostninger": "investeringsomkostninger",
+    "fees-i-fonde": "fees i fonde",
+    "afkast-unhedged": "afkast uden valutaafdækning",
+    "loebende-afkast": "løbende afkast",
+    "kursaendring": "kursændring",
+    "inflation": "inflationsforventning",
+    "horisontafkast": "horisontafkast",
+}
 
 
 def listing_html(folder: Path, node: dict) -> str:
-    """Oversigtsside for en mappe: links til alt, der ligger direkte under den."""
+    """Oversigtsside for en mappe: brødkrummesti og derunder en lodret liste
+    med alt, der ligger direkte under mappen."""
     e = html.escape
     parts = folder.relative_to(SITE).parts
+    sep = "<span class=sep>/</span>"
     crumbs = [f"<a href='{'../' * len(parts)}'>afkastforventninger</a>"]
-    for i, part in enumerate(parts):
-        up = "../" * (len(parts) - 1 - i) or "./"
-        crumbs.append(f"<a href='{up}'>{e(part)}</a>")
-    rows = []
+    for i, part in enumerate(parts[:-1]):
+        crumbs.append(f"<a href='{'../' * (len(parts) - 1 - i)}'>{e(part)}</a>")
+    crumbs.append(f"<span class=here>{e(parts[-1])}</span>")
+
     # mapper først (horisonter i naturlig rækkefølge, resten alfabetisk), derefter tallene
     hz = {"1-5": 0, "6-10": 1, "1-10": 2, "11-plus": 3}
-    folders = sorted((k for k, v in node.items() if isinstance(v, dict)),
-                     key=lambda k: (hz.get(k, 9), k))
+    top = {"latest": 0, "current": 1}
+    folders = [k for k, v in node.items() if isinstance(v, dict)]
+    if parts == ("api",):
+        folders.sort(key=lambda k: (top.get(k, 2), -int(k) if k.isdigit() else 0))
+    else:
+        folders.sort(key=lambda k: (hz.get(k, 9), k))
     values = [k for k, v in node.items() if not isinstance(v, dict)]
+
+    rows = []
     for name in folders + values:
         child = node[name]
+        label = f"<span class=label>{e(LABELS.get(name, ''))}</span>"
         if isinstance(child, dict):
-            rows.append(f"<tr><td><a href='{e(name)}/'>{e(name)}/</a></td><td></td>"
-                        f"<td><a href='{e(name)}.json'>{e(name)}.json</a></td></tr>")
+            body = (f"<a class=main href='{e(name)}/'><span class=name>{e(name)}/</span>"
+                    f"{label}<span class=go>›</span></a>")
         else:
-            rows.append(f"<tr><td><a href='{e(name)}'>{e(name)}</a></td><td class=n>{fmt(child)}</td>"
-                        f"<td><a href='{e(name)}.json'>{e(name)}.json</a></td></tr>")
-    path = "/".join(parts)
+            pct = f"{child * 100:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+            body = (f"<a class=main href='{e(name)}'><span class=name>{e(name)}</span>"
+                    f"{label}<span class=val>{fmt(child)}</span><span class=pct>{pct} %</span></a>")
+        rows.append(f"<li>{body}<a class=json href='{e(name)}.json'>.json</a></li>")
+
+    path = "/".join(("afkastforventninger",) + parts)
     return (
         f"<!doctype html>\n<html lang=\"da\"><meta charset=\"utf-8\">"
         f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-        f"<title>{e(path)} – Afkastforventninger</title>\n<style>{PAGE_CSS}</style>\n"
-        f"<p>{' / '.join(crumbs)}</p>\n"
-        f"<p>Alt herunder som JSON: <a href='../{e(parts[-1])}.json'>{e(parts[-1])}.json</a></p>\n"
-        f"<table>{''.join(rows)}</table>\n</html>\n")
+        f"<title>{e(path)}</title>\n<style>{PAGE_CSS}</style>\n"
+        f"<h1 class=crumbs>{sep.join(crumbs)}</h1>\n"
+        f"<p class=sub>{e(LABELS.get(parts[-1], parts[-1]))} · alt herunder som JSON: "
+        f"<a href='../{e(parts[-1])}.json'>{e(parts[-1])}.json</a></p>\n"
+        f"<ul class=list>{''.join(rows)}</ul>\n</html>\n")
 
 
 def write_tree(folder: Path, node: dict, own_json: bool = True) -> None:
@@ -329,6 +383,11 @@ def main() -> int:
     latest = periods[-1]
     current = current_period(periods, dt.date.today())
     n = 0
+    for d in data.values():
+        for h in d["horisonter"].values():
+            for slug, a in h["aktivklasser"].items():
+                LABELS[slug] = a["navn"]
+        LABELS[str(d["aar"])] = f"forventninger for {d['aar']}"
     for key, d in data.items():
         n += write_period(API / str(d["aar"]) / f"h{d['halvaar']}", d)
     write_period(API / "latest", data[latest])
