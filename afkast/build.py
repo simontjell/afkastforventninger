@@ -57,6 +57,24 @@ def write_period(base: Path, d: dict) -> int:
         p.parent.mkdir(parents=True, exist_ok=True)
         s = fmt(v)
         p.with_name(p.name + ".html").write_text(s)
+
+    # Hver mappe svarer med alt, der ligger under den, som JSON:
+    # .../inflation/ -> {"1-5": 0.018, "6-10": 0.018, ...}
+    tree: dict = {}
+    for rel, v in eps.items():
+        node = tree
+        *dirs, leaf = rel.split("/")
+        for seg in dirs:
+            node = node.setdefault(seg, {})
+        node[leaf] = json.loads(fmt(v))
+
+    def write_index(folder: Path, node: dict) -> None:
+        (folder / "index.html").write_text(json.dumps(node, ensure_ascii=False))
+        for name, child in node.items():
+            if isinstance(child, dict):
+                write_index(folder / name, child)
+
+    write_index(base, tree)
     base.with_name(base.name + ".json").write_text(
         json.dumps(d, indent=2, ensure_ascii=False) + "\n")
     return len(eps)
@@ -74,6 +92,7 @@ def patterns_html(index: dict) -> str:
         ("afkast for en bestemt horisont", "/{år}/h{1|2}/{horisont}/{aktivklasse}"),
         ("et bestemt nøgletal", "/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
         ("inflationsforventning", "/{år}/h{1|2}/inflation/{horisont}"),
+        ("alle tal under en sti som JSON: afslut med /", "/{år}/h{1|2}/inflation/"),
         ("horisontafkast", "/{år}/h{1|2}/horisontafkast"),
         ("alt for halvåret, inkl. korrelationer", "/{år}/h{1|2}.json"),
         (f"nyeste offentliggjorte ({index['latest']})", "/latest/…"),
@@ -103,6 +122,8 @@ def examples_html(index: dict) -> str:
         (f"Fees i fonde for private equity, 1-10 år, {navn}", f"{per}/1-10/fees-i-fonde/private-equity"),
         (f"Afkast på aktier fra år 11 og frem, {navn}", f"{per}/11-plus/aktier"),
         (f"Inflationsforventning, 1-5 år, {navn}", f"{per}/inflation/1-5"),
+        (f"Inflationsforventning for alle horisonter, {navn}", f"{per}/inflation/"),
+        (f"Afkast for alle aktivklasser, 1-5 år, {navn}", f"{per}/1-5/afkast/"),
         (f"Horisontafkast, {navn}", f"{per}/horisontafkast"),
         ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "latest/ejendomme"),
         ("Afkast på ejendomme i det halvår, der gælder i dag", "current/ejendomme"),
@@ -172,6 +193,14 @@ def openapi(index: dict) -> dict:
             "operationId": f"get{op or 'Halvaar'}" + ("" if not op else "Halvaar"),
             "summary": "Alt for halvåret, inkl. korrelationer." + note,
             "parameters": [ref(x) for x in pp], "responses": obj("Hele halvåret.")}}
+        paths[f"{prefix}/inflation/"] = {"get": {
+            "operationId": f"get{op}InflationAlle",
+            "summary": "Inflationsforventning for alle horisonter." + note
+                       + " Alle mapper svarer på samme måde med tallene under sig, når adressen ender på /.",
+            "parameters": [ref(x) for x in pp],
+            "responses": {"200": {"description": "Horisont -> inflation.", "content": {"text/html": {
+                "schema": {"type": "object", "additionalProperties": {"type": "number"}},
+                "example": {"1-5": 0.018, "6-10": 0.018, "1-10": 0.018, "11-plus": 0.02}}}}}}}
         for tail, name, summary, tp in values:
             paths[f"{prefix}/{tail}"] = {"get": {
                 "operationId": f"get{op}{name}", "summary": summary + note,

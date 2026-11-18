@@ -17,6 +17,7 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 | `/{år}/h{1\|2}/{horisont}/{aktivklasse}` | afkast for horisonten |
 | `/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}` | et bestemt nøgletal |
 | `/{år}/h{1\|2}/inflation/{horisont}` | inflationsforventning |
+| en mappe, fx `/{år}/h{1\|2}/inflation/` | alle tal under stien som JSON-objekt |
 | `/{år}/h{1\|2}/horisontafkast` | horisontafkast (fra 2021 h2) |
 | `/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
 | `/latest/…` | nyeste offentliggjorte halvår |
