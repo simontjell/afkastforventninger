@@ -23,8 +23,8 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 | `/api/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
 | `/api/latest/…` | nyeste offentliggjorte halvår |
 | `/api/current/…` | halvåret, der gælder i dag |
-| `/api/` | start her: oversigt med links ned gennem alle halvår |
-| `/index.json` | halvår, aktivklasser, horisonter, nøgletal |
+| `/api/` | hele API'et som træ, hvor hver knude linker til sin `.json` |
+| `/api.json` | roden: alle halvår samt `latest` og `current` (hvert med `periode` og `kilde`) |
 | `/openapi.json` | OpenAPI 3.1-skema for alle adresser |
 
 - **Horisonter:** `1-5`, `6-10`, `1-10`, `11-plus`

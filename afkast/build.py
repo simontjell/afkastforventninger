@@ -316,9 +316,6 @@ def openapi(index: dict) -> dict:
         ("/api/current", "Current", f" Halvåret, der gælder i dag (p.t. {index['current']}).", []),
     ]
     paths: dict = {
-        "/index.json": {"get": {
-            "operationId": "getIndex", "summary": "Halvår, aktivklasser, horisonter og nøgletal.",
-            "responses": obj("Oversigt.")}},
         "/api.json": {"get": {
             "operationId": "getAlt", "summary": "Roden i træet: alle halvår samt latest og current.",
             "responses": obj("latest, current og hvert år -> halvår -> hele halvåret.")}},
@@ -509,7 +506,6 @@ def main() -> int:
                       "kilde": d["kilde"]} for k, d in data.items()],
     }
     (SITE / "openapi.json").write_text(json.dumps(openapi(index), indent=2, ensure_ascii=False) + "\n")
-    (SITE / "index.json").write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n")
     (SITE / "index.html").write_text(index_html(index, data[current]))
     (SITE / "favicon.svg").write_text(FAVICON)
     (SITE / "404.html").write_text(
