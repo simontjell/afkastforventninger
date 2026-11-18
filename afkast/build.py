@@ -213,7 +213,7 @@ code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.
 td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre{{background:#262626}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
 <h1>Afkastforventninger som API</h1>
 <p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
-som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
+som decimaltal på faste adresser. Dette er et uofficielt API (uden lovning om korrekthed) lavet på baggrund af rådets Excel-ark (som stadig er den officielle kilde).</p>
 <p>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
 <h2>Eksempler</h2>
 <ul class="ex">{examples}</ul>
