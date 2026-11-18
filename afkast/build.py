@@ -138,7 +138,9 @@ def listing_html(folder: Path, node: dict) -> str:
     return (
         f"<!doctype html>\n<html lang=\"da\"><meta charset=\"utf-8\">"
         f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-        f"<title>{e(path)}</title>\n<style>{PAGE_CSS}</style>\n"
+        f"<title>{e(path)}</title>\n"
+        f"<link rel=\"icon\" href=\"{'../' * len(parts)}favicon.svg\" type=\"image/svg+xml\">\n"
+        f"<style>{PAGE_CSS}</style>\n"
         f"<h1 class=crumbs>{sep.join(crumbs)}</h1>\n"
         f"<p class=sub>{e(LABELS.get(parts[-1], parts[-1]))} · alt herunder som JSON: "
         f"<a href='../{e(parts[-1])}.json'>{e(parts[-1])}.json</a></p>\n"
@@ -329,39 +331,166 @@ def openapi(index: dict) -> dict:
     }
 
 
-def index_html(index: dict) -> str:
+INDEX_CSS = """
+:root{--bg:#fbfbfa;--fg:#1c1c1a;--muted:#6f6f6a;--line:#e6e5e1;--hover:#f1f0ec;--link:#0b57a4;--pill:#eeede9;
+--accent:#12325a;--code:#f3f2ee;--c:#7a7a74;--v:#0b57a4;--p:#a23b2a}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--fg:#e8e6e1;--muted:#9a9891;--line:#2a2a28;--hover:#1e1e1c;--link:#8ab4f8;--pill:#262624;
+--accent:#8ab4f8;--code:#1c1c1a;--c:#8b8a84;--v:#8ab4f8;--p:#e39a8c}}
+*{box-sizing:border-box}
+html{border-top:4px solid var(--accent)}
+body{font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:52rem;margin:0 auto;padding:3rem 1rem 4rem;color:var(--fg);background:var(--bg)}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+header{padding-bottom:2rem;border-bottom:1px solid var(--line)}
+.over{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem}
+h1{font:400 2.5rem/1.15 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;letter-spacing:-.01em;margin:0 0 1rem;color:var(--accent)}
+.lead{max-width:40rem;margin:0 0 .5rem}
+.by{color:var(--muted);font-size:.9rem;margin:0}
+nav{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;margin-top:1.5rem;font-size:.95rem}
+nav a{font-weight:600}
+section{padding:2.25rem 0 0}
+h2{font:400 1.45rem/1.25 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;margin:0 0 .25rem;color:var(--accent)}
+.note{color:var(--muted);font-size:.9rem;margin:0 0 1rem;max-width:40rem}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;
+padding:.5rem .75rem;border-bottom:1px solid var(--fg);white-space:nowrap}
+td{padding:.5rem .75rem;border-bottom:1px solid var(--line);vertical-align:baseline}
+th:first-child,td:first-child{padding-left:0}th:last-child,td:last-child{padding-right:0}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.n a{color:inherit}
+tbody tr:hover{background:var(--hover)}
+tfoot td{border-top:1px solid var(--fg);border-bottom:0;color:var(--muted)}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em}
+code{background:var(--code);padding:.1em .35em;border-radius:3px}
+td code{white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--line);border-radius:4px;padding:1rem;overflow-x:auto;font:10px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0}
+.c{color:var(--c);font-style:italic}.v{color:var(--v)}.p{color:var(--p)}
+.ex{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.ex li{padding:.6rem 0;border-bottom:1px solid var(--line)}
+.ex br{display:none}
+.ex a{display:block;font:.8rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere;margin-top:.1rem}
+.ref td:first-child{width:21rem}
+@media(max-width:40rem){h1{font-size:2rem}body{padding-top:2rem}table{font-size:.82rem}th,td{padding:.45rem .22rem}th{letter-spacing:0;font-size:.62rem}.ref td:first-child{width:auto}}
+h3{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:1.5rem 0 0}
+footer{margin-top:3rem;padding-top:1.25rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+footer p{margin:0 0 .35rem;max-width:44rem}
+"""
+
+
+FAVICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect width="64" height="64" rx="12" fill="#12325a"/>
+<path d="M13 46 L26 34 L35 40 L51 19" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="51" cy="19" r="4" fill="#fff"/>
+</svg>
+"""
+
+
+def pct(v: float) -> str:
+    return f"{v * 100:.1f}".replace(".", ",")
+
+
+def index_html(index: dict, cur: dict) -> str:
     e = html.escape
-    rows = "".join(
-        f"<tr><td><a href='api/{p['aar']}/h{p['halvaar']}.json'>{p['aar']} h{p['halvaar']}</a></td>"
-        f"<td><a href='{e(p['kilde'])}'>regneark</a></td></tr>" for p in reversed(index["perioder"]))
-    assets = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser"].items())
-    long_ = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser_11_plus"].items())
-    metrics = "".join(f"<li><code>{e(m)}</code></li>" for m in index["noegletal"])
+    navn = f"{cur['halvaar']}. halvår {cur['aar']}"
+    hs = cur["horisonter"]
+
+    def cell(path: str, v) -> str:
+        if v is None:
+            return "<td class=n></td>"
+        return f"<td class=n><a href='api/current/{e(path)}' title='{fmt(v)}'>{pct(v)}</a></td>"
+
+    main_rows = "".join(
+        f"<tr><td>{e(a['navn'])}</td>"
+        + "".join(cell(f"{h}/{slug}", hs[h]["aktivklasser"][slug]["afkast"]) for h in ("1-5", "6-10", "1-10"))
+        + cell(f"1-10/standardafvigelse/{slug}", a.get("standardafvigelse")) + "</tr>"
+        for slug, a in hs["1-10"]["aktivklasser"].items())
+    infl = cur["inflation"]
+    infl_row = ("<tr><td>Inflation</td>"
+                + "".join(cell(f"inflation/{h}", infl.get(h)) for h in ("1-5", "6-10", "1-10"))
+                + "<td class=n></td></tr>")
+    long_rows = "".join(
+        f"<tr><td>{e(a['navn'])}</td>" + cell(f"11-plus/{slug}", a["afkast"])
+        + cell(f"11-plus/standardafvigelse/{slug}", a.get("standardafvigelse")) + "</tr>"
+        for slug, a in hs["11-plus"]["aktivklasser"].items())
+    long_rows += f"<tr><td>Inflation</td>{cell('inflation/11-plus', infl.get('11-plus'))}<td class=n></td></tr>"
+
+    def ref(items) -> str:
+        return "".join(f"<tr><td><code>{e(s)}</code></td><td>{e(n)}</td></tr>" for s, n in items)
+
+    assets = ref(list(index["aktivklasser"].items()) + list(index["aktivklasser_11_plus"].items()))
+    horizons = ref((h, LABELS.get(h, h)) for h in index["horisonter"])
+    metrics = ref((m, LABELS.get(m, m)) for m in index["noegletal"])
+    periods = "".join(
+        f"<tr><td>{p['halvaar']}. halvår {p['aar']}</td>"
+        f"<td><a class=mono href='api/{p['aar']}/h{p['halvaar']}/'>api/{p['aar']}/h{p['halvaar']}/</a></td>"
+        f"<td><a class=mono href='api/{p['aar']}/h{p['halvaar']}.json'>.json</a></td>"
+        f"<td><a href='{e(p['kilde'])}'>Rådets regneark</a></td></tr>"
+        for p in reversed(index["perioder"]))
     examples = examples_html(index)
     patterns = patterns_html(index)
     return f"""<!doctype html>
 <html lang="da"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Afkastforventninger – API</title>
-<style>body{{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#222;background:#fff}}
-code,pre{{background:#f3f3f3;padding:.1em .3em;border-radius:3px}}pre{{padding:.8em;overflow-x:auto;font-size:10px}}
-.ex{{padding-left:1.2em}}.ex li{{margin:.5em 0}}.ex a{{font:12px ui-monospace,monospace;overflow-wrap:anywhere}}
-.c{{color:#6a737d;font-style:italic}}.v{{color:#0550ae}}.p{{color:#cf222e}}
-td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background:#161616;color:#ddd}}code,pre{{background:#262626}}a{{color:#8ab4f8}}.c{{color:#8b949e}}.v{{color:#79c0ff}}.p{{color:#ff7b72}}}}</style>
-<h1>Afkastforventninger som API</h1>
-<p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>{INDEX_CSS}</style>
+<header>
+<p class="over">Uofficielt API</p>
+<h1>Afkastforventninger</h1>
+<p class="lead">Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Dette er et uofficielt API (uden lovning om korrekthed) lavet på baggrund af rådets Excel-ark (som stadig er den officielle kilde).</p>
-<p>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
+<p class="by">Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
+<nav><a href="api/">API-oversigt</a><a href="openapi.json">OpenAPI-skema</a><a href="index.json">index.json</a>
+<a href="https://github.com/simontjell/afkastforventninger">Kildekode</a></nav>
+</header>
+
+<section>
+<h2>Gældende forventninger</h2>
+<p class="note">{e(navn)}. Forventet årligt afkast og standardafvigelse i pct. Hvert tal linker til sin adresse i API'et.</p>
+<div class="scroll"><table>
+<thead><tr><th>Aktivklasse</th><th class=n>År 1-5</th><th class=n>År 6-10</th><th class=n>År 1-10</th><th class=n>Std.afv.</th></tr></thead>
+<tbody>{main_rows}</tbody>
+<tfoot>{infl_row}</tfoot>
+</table></div>
+<h3>År 11 og frem</h3>
+<div class="scroll"><table>
+<thead><tr><th>Aktivklasse</th><th class=n>Afkast</th><th class=n>Std.afv.</th></tr></thead>
+<tbody>{long_rows}</tbody>
+</table></div>
+</section>
+
+<section>
+<h2>Adresser</h2>
+<p class="note">Svaret er tallet alene (<code>0.067</code> = 6,7 %). Tilføj <code>.json</code> til en adresse for <code>application/json</code>. En mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
+<pre>{patterns}</pre>
+</section>
+
+<section>
 <h2>Eksempler</h2>
 <ul class="ex">{examples}</ul>
-<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Tilføj <code>.json</code> til en adresse for <code>application/json</code>; en mappe afsluttet med <code>/</code> viser links til det, der ligger under den.</p>
-<h2>Mønstre</h2>
-<pre>{patterns}</pre>
-<p>Maskinlæsbar beskrivelse: <a href="openapi.json">openapi.json</a> (OpenAPI 3.1).</p>
-<h2>Horisonter</h2><p><code>1-5</code>, <code>6-10</code>, <code>1-10</code>, <code>11-plus</code></p>
-<h2>Aktivklasser</h2><ul>{assets}</ul><p>På <code>11-plus</code>:</p><ul>{long_}</ul>
-<h2>Nøgletal</h2><ul>{metrics}</ul>
-<h2>Halvår</h2><table>{rows}</table>
-<p><small>Bygget {e(index['bygget'])}.</small></p></html>
+</section>
+
+<section>
+<h2>Reference</h2>
+<div class="ref">
+<h3>Aktivklasser</h3><div class="scroll"><table><tbody>{assets}</tbody></table></div>
+<h3>Horisonter</h3><div class="scroll"><table><tbody>{horizons}</tbody></table></div>
+<h3>Nøgletal</h3><div class="scroll"><table><tbody>{metrics}</tbody></table></div>
+</div>
+</section>
+
+<section>
+<h2>Halvår</h2>
+<div class="scroll"><table>
+<thead><tr><th>Halvår</th><th>Oversigt</th><th>Alt</th><th>Kilde</th></tr></thead>
+<tbody>{periods}</tbody>
+</table></div>
+</section>
+
+<footer>
+<p>Uofficielt API uden lovning om korrekthed. Rådets regneark er den officielle kilde.</p>
+<p>Data opdateres dagligt fra afkastforventninger.dk. Senest bygget {e(index['bygget'][:16].replace('T', ' '))} UTC.</p>
+</footer>
+</html>
 """
 
 
@@ -428,7 +557,8 @@ def main() -> int:
     }
     (SITE / "openapi.json").write_text(json.dumps(openapi(index), indent=2, ensure_ascii=False) + "\n")
     (SITE / "index.json").write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n")
-    (SITE / "index.html").write_text(index_html(index))
+    (SITE / "index.html").write_text(index_html(index, data[current]))
+    (SITE / "favicon.svg").write_text(FAVICON)
     (SITE / "404.html").write_text(
         "<!doctype html><meta charset=utf-8><title>404</title>"
         "<p>Ukendt sti. Se <a href='/afkastforventninger/'>forsiden</a> eller <a href='/afkastforventninger/api/'>/api/</a>.</p>\n")
