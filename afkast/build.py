@@ -214,6 +214,7 @@ td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background
 <h1>Afkastforventninger som API</h1>
 <p>Tallene fra <a href="https://afkastforventninger.dk/afkastforventninger">Rådet for Afkastforventninger</a>
 som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
+<p>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>.</p>
 <h2>Eksempler</h2>
 <ul class="ex">{examples}</ul>
 <p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Indholdet er gyldig JSON.</p>
@@ -224,7 +225,7 @@ som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.
 <h2>Aktivklasser</h2><ul>{assets}</ul><p>På <code>11-plus</code>:</p><ul>{long_}</ul>
 <h2>Nøgletal</h2><ul>{metrics}</ul>
 <h2>Halvår</h2><table>{rows}</table>
-<p><small>Lavet af <a href="https://simplesystemer.dk">Simple Systemer</a>. Bygget {e(index['bygget'])}.</small></p></html>
+<p><small>Bygget {e(index['bygget'])}.</small></p></html>
 """
 
 
