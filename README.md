@@ -33,15 +33,16 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 - **Nøgletal:** `afkast`, `standardafvigelse`, `investeringsomkostninger`, og hvor rådet
   oplyser dem: `fees-i-fonde`, `afkast-unhedged`, `loebende-afkast`, `kursaendring`.
 
-Svaret er tallet alene (`0.067` = 6,7 %). Tilføj `.txt` eller `.json` til stien for
-`text/plain` hhv. `application/json`; uden endelse er det `text/html`.
+Svaret er tallet alene som JSON (`0.067` = 6,7 %), uden endelse på adressen. GitHub Pages
+sender dog `Content-Type: text/html` for adresser uden endelse; indholdet kan læses som JSON
+alligevel (`fetch(url).then(r => r.json())`).
 
 ```bash
 curl https://simontjell.github.io/afkastforventninger/2027/h1/1-5/globale-aktier-developed-markets
 ```
 
 ```
-=IMPORTDATA("https://simontjell.github.io/afkastforventninger/latest/globale-aktier-developed-markets.txt")
+=IMPORTDATA("https://simontjell.github.io/afkastforventninger/latest/globale-aktier-developed-markets")
 ```
 
 ## Sådan virker det

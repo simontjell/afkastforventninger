@@ -1,6 +1,6 @@
 """Bygger det statiske API i _site/ ud fra regnearkene i kilder/.
 
-Hvert tal skrives som tre filer: <sti>.html, <sti>.txt og <sti>.json.
+Hvert tal skrives som én fil, <sti>.html, hvis indhold er tallet som JSON.
 GitHub Pages serverer <sti>.html på adressen <sti> (uden endelse og uden
 redirect), så .../2026/h1/globale-aktier-developed-markets svarer med 0.067.
 """
@@ -57,8 +57,6 @@ def write_period(base: Path, d: dict) -> int:
         p.parent.mkdir(parents=True, exist_ok=True)
         s = fmt(v)
         p.with_name(p.name + ".html").write_text(s)
-        p.with_name(p.name + ".txt").write_text(s + "\n")
-        p.with_name(p.name + ".json").write_text(s + "\n")
     base.with_name(base.name + ".json").write_text(
         json.dumps(d, indent=2, ensure_ascii=False) + "\n")
     return len(eps)
@@ -108,8 +106,6 @@ def examples_html(index: dict) -> str:
         (f"Horisontafkast, {navn}", f"{per}/horisontafkast"),
         ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "latest/ejendomme"),
         ("Afkast på ejendomme i det halvår, der gælder i dag", "current/ejendomme"),
-        ("Samme som ren tekst", "current/ejendomme.txt"),
-        ("Samme som JSON", "current/ejendomme.json"),
         (f"Alt for {navn}, inkl. korrelationer", f"{per}.json"),
         ("Oversigt over halvår, aktivklasser, horisonter og nøgletal", "index.json"),
         ("OpenAPI 3.1-skema", "openapi.json"),
@@ -124,7 +120,7 @@ BASE_URL = "https://simontjell.github.io/afkastforventninger"
 
 
 def openapi(index: dict) -> dict:
-    """OpenAPI 3.1-beskrivelse af .json-udgaverne af alle adresser."""
+    """OpenAPI 3.1-beskrivelse af alle adresser."""
     years = sorted({p["aar"] for p in index["perioder"]})
     assets = list(index["aktivklasser"]) + list(index["aktivklasser_11_plus"])
     params = {
@@ -147,7 +143,8 @@ def openapi(index: dict) -> dict:
     }
     number = {
         "200": {"description": "Tallet som decimaltal (0.067 = 6,7 %).",
-                "content": {"application/json": {"schema": {"type": "number"}, "example": 0.067}}},
+                # GitHub Pages sender text/html for adresser uden endelse; indholdet er JSON.
+                "content": {"text/html": {"schema": {"type": "number"}, "example": 0.067}}},
         "404": {"description": "Kombinationen findes ikke."},
     }
     obj = lambda desc: {
@@ -176,7 +173,7 @@ def openapi(index: dict) -> dict:
             "summary": "Alt for halvåret, inkl. korrelationer." + note,
             "parameters": [ref(x) for x in pp], "responses": obj("Hele halvåret.")}}
         for tail, name, summary, tp in values:
-            paths[f"{prefix}/{tail}.json"] = {"get": {
+            paths[f"{prefix}/{tail}"] = {"get": {
                 "operationId": f"get{op}{name}", "summary": summary + note,
                 "parameters": [ref(x) for x in pp + tp], "responses": number}}
     return {
@@ -187,8 +184,8 @@ def openapi(index: dict) -> dict:
             "description": (
                 "Uofficielt, statisk API med tallene fra Rådet for Afkastforventninger "
                 "(https://afkastforventninger.dk/afkastforventninger). Hver adresse svarer med "
-                "ét decimaltal. Skemaet beskriver .json-udgaverne; uden endelse er svaret "
-                "text/html, og med .txt er det text/plain. Kun GET."),
+                "ét decimaltal som JSON (fx 0.067). Bemærk: GitHub Pages sender Content-Type "
+                "text/html for disse adresser, selv om indholdet er JSON. Kun GET."),
         },
         "servers": [{"url": BASE_URL}],
         "paths": paths,
@@ -219,7 +216,7 @@ td{{padding:.1em 1em .1em 0}}@media(prefers-color-scheme:dark){{body{{background
 som decimaltal på faste adresser. Uofficielt; regnearkene hos rådet er kilden.</p>
 <h2>Eksempler</h2>
 <ul class="ex">{examples}</ul>
-<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Uden endelse er det <code>text/html</code>; <code>.txt</code> og <code>.json</code> giver en anden content-type.</p>
+<p>Svaret er tallet alene (<code>0.067</code> = 6,7 %). Indholdet er gyldig JSON.</p>
 <h2>Mønstre</h2>
 <pre>{patterns}</pre>
 <p>Maskinlæsbar beskrivelse: <a href="openapi.json">openapi.json</a> (OpenAPI 3.1).</p>
