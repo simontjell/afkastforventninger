@@ -19,6 +19,7 @@ from .parse import DEFAULT_HORIZON, parse_workbook
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "kilder"
 SITE = ROOT / "_site"
+API = SITE / "api"   # alle data ligger under /api/
 
 
 def fmt(v: float) -> str:
@@ -134,17 +135,18 @@ def current_period(periods: list[str], today: dt.date) -> str:
 def patterns_html(index: dict) -> str:
     """Stimønstrene med kommentar over hver og simpel syntaksfarvning."""
     items = [
-        (f"afkast, {DEFAULT_HORIZON} år", "/{år}/h{1|2}/{aktivklasse}"),
-        ("afkast for en bestemt horisont", "/{år}/h{1|2}/{horisont}/{aktivklasse}"),
-        ("et bestemt nøgletal", "/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
-        ("inflationsforventning", "/{år}/h{1|2}/inflation/{horisont}"),
-        ("ethvert tal som application/json: tilføj .json", "/{år}/h{1|2}/{aktivklasse}.json"),
-        ("alle tal under en mappe som JSON: mappens navn + .json", "/{år}/h{1|2}/inflation.json"),
-        ("oversigt med links til det underliggende: afslut med /", "/{år}/h{1|2}/inflation/"),
-        ("horisontafkast", "/{år}/h{1|2}/horisontafkast"),
-        ("alt for halvåret, inkl. korrelationer", "/{år}/h{1|2}.json"),
-        (f"nyeste offentliggjorte ({index['latest']})", "/latest/…"),
-        (f"gældende i dag ({index['current']})", "/current/…"),
+        (f"afkast, {DEFAULT_HORIZON} år", "/api/{år}/h{1|2}/{aktivklasse}"),
+        ("afkast for en bestemt horisont", "/api/{år}/h{1|2}/{horisont}/{aktivklasse}"),
+        ("et bestemt nøgletal", "/api/{år}/h{1|2}/{horisont}/{nøgletal}/{aktivklasse}"),
+        ("inflationsforventning", "/api/{år}/h{1|2}/inflation/{horisont}"),
+        ("ethvert tal som application/json: tilføj .json", "/api/{år}/h{1|2}/{aktivklasse}.json"),
+        ("alle tal under en mappe som JSON: mappens navn + .json", "/api/{år}/h{1|2}/inflation.json"),
+        ("oversigt med links til det underliggende: afslut med /", "/api/{år}/h{1|2}/inflation/"),
+        ("horisontafkast", "/api/{år}/h{1|2}/horisontafkast"),
+        ("alt for halvåret, inkl. korrelationer", "/api/{år}/h{1|2}.json"),
+        (f"nyeste offentliggjorte ({index['latest']})", "/api/latest/…"),
+        (f"gældende i dag ({index['current']})", "/api/current/…"),
+        ("start her og klik dig ned gennem det hele", "/api/"),
         ("halvår, aktivklasser, horisonter og nøgletal", "/index.json"),
     ]
     out = []
@@ -164,20 +166,21 @@ def examples_html(index: dict) -> str:
     per = f"{y}/{h}"
     navn = f"{h[1]}. halvår {y}"
     items = [
-        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"{per}/globale-aktier-developed-markets"),
-        (f"Samme, men på horisonten 1-5 år", f"{per}/1-5/globale-aktier-developed-markets"),
-        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"{per}/6-10/standardafvigelse/hedgefonde"),
-        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"{per}/1-10/fees-i-fonde/private-equity"),
-        (f"Afkast på aktier fra år 11 og frem, {navn}", f"{per}/11-plus/aktier"),
-        (f"Inflationsforventning, 1-5 år, {navn}", f"{per}/inflation/1-5"),
-        (f"Inflationsforventning for alle horisonter som JSON, {navn}", f"{per}/inflation.json"),
-        (f"Afkast for alle aktivklasser som JSON, 1-5 år, {navn}", f"{per}/1-5/afkast.json"),
-        ("Samme tal i det halvår, der gælder i dag", "current/1-5/afkast.json"),
-        (f"Oversigt med links til alt under {navn}", f"{per}/"),
-        (f"Horisontafkast, {navn}", f"{per}/horisontafkast"),
-        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "latest/ejendomme"),
-        ("Afkast på ejendomme i det halvår, der gælder i dag", "current/ejendomme"),
-        (f"Alt for {navn}, inkl. korrelationer", f"{per}.json"),
+        ("Start her: oversigt med links til alle halvår", "api/"),
+        (f"Afkast på globale aktier, {DEFAULT_HORIZON} år, {navn}", f"api/{per}/globale-aktier-developed-markets"),
+        (f"Samme, men på horisonten 1-5 år", f"api/{per}/1-5/globale-aktier-developed-markets"),
+        (f"Standardafvigelse på hedgefonde, 6-10 år, {navn}", f"api/{per}/6-10/standardafvigelse/hedgefonde"),
+        (f"Fees i fonde for private equity, 1-10 år, {navn}", f"api/{per}/1-10/fees-i-fonde/private-equity"),
+        (f"Afkast på aktier fra år 11 og frem, {navn}", f"api/{per}/11-plus/aktier"),
+        (f"Inflationsforventning, 1-5 år, {navn}", f"api/{per}/inflation/1-5"),
+        (f"Inflationsforventning for alle horisonter som JSON, {navn}", f"api/{per}/inflation.json"),
+        (f"Afkast for alle aktivklasser som JSON, 1-5 år, {navn}", f"api/{per}/1-5/afkast.json"),
+        ("Samme tal i det halvår, der gælder i dag", "api/current/1-5/afkast.json"),
+        (f"Oversigt med links til alt under {navn}", f"api/{per}/"),
+        (f"Horisontafkast, {navn}", f"api/{per}/horisontafkast"),
+        ("Afkast på ejendomme i det nyeste offentliggjorte halvår", "api/latest/ejendomme"),
+        ("Afkast på ejendomme i det halvår, der gælder i dag", "api/current/ejendomme"),
+        (f"Alt for {navn}, inkl. korrelationer", f"api/{per}.json"),
         ("Oversigt over halvår, aktivklasser, horisonter og nøgletal", "index.json"),
         ("OpenAPI 3.1-skema", "openapi.json"),
     ]
@@ -230,9 +233,9 @@ def openapi(index: dict) -> dict:
         ("horisontafkast", "Horisontafkast", "Horisontafkast (findes fra 2021 h2).", []),
     ]
     prefixes = [
-        ("/{aar}/h{halvaar}", "", "", ["aar", "halvaar"]),
-        ("/latest", "Latest", f" Nyeste offentliggjorte halvår (p.t. {index['latest']}).", []),
-        ("/current", "Current", f" Halvåret, der gælder i dag (p.t. {index['current']}).", []),
+        ("/api/{aar}/h{halvaar}", "", "", ["aar", "halvaar"]),
+        ("/api/latest", "Latest", f" Nyeste offentliggjorte halvår (p.t. {index['latest']}).", []),
+        ("/api/current", "Current", f" Halvåret, der gælder i dag (p.t. {index['current']}).", []),
     ]
     paths: dict = {"/index.json": {"get": {
         "operationId": "getIndex", "summary": "Halvår, aktivklasser, horisonter og nøgletal.",
@@ -275,7 +278,7 @@ def openapi(index: dict) -> dict:
 def index_html(index: dict) -> str:
     e = html.escape
     rows = "".join(
-        f"<tr><td><a href='{p['aar']}/h{p['halvaar']}.json'>{p['aar']} h{p['halvaar']}</a></td>"
+        f"<tr><td><a href='api/{p['aar']}/h{p['halvaar']}.json'>{p['aar']} h{p['halvaar']}</a></td>"
         f"<td><a href='{e(p['kilde'])}'>regneark</a></td></tr>" for p in reversed(index["perioder"]))
     assets = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser"].items())
     long_ = "".join(f"<li><code>{e(s)}</code> – {e(n)}</li>" for s, n in index["aktivklasser_11_plus"].items())
@@ -327,14 +330,24 @@ def main() -> int:
     current = current_period(periods, dt.date.today())
     n = 0
     for key, d in data.items():
-        n += write_period(SITE / str(d["aar"]) / f"h{d['halvaar']}", d)
-    for year in sorted({d["aar"] for d in data.values()}):
-        folder = SITE / str(year)
-        halves = {f"h{d['halvaar']}": {} for d in data.values() if d["aar"] == year}
-        (folder / "index.html").write_text(listing_html(folder, dict(sorted(halves.items()))).replace(
-            f"<p>Alt herunder som JSON: <a href='../{year}.json'>{year}.json</a></p>\n", ""))
-    write_period(SITE / "latest", data[latest])
-    write_period(SITE / "current", data[current])
+        n += write_period(API / str(d["aar"]) / f"h{d['halvaar']}", d)
+    write_period(API / "latest", data[latest])
+    write_period(API / "current", data[current])
+
+    # Niveauerne over halvårene følger samme mønster: X/ er en oversigt, X.json er alt under X.
+    def dump(path: Path, obj) -> None:
+        path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n")
+
+    everything: dict = {"latest": data[latest], "current": data[current]}
+    for year in sorted({d["aar"] for d in data.values()}, reverse=True):
+        halves = {f"h{d['halvaar']}": d for d in data.values() if d["aar"] == year}
+        halves = dict(sorted(halves.items()))
+        everything[str(year)] = halves
+        (API / str(year) / "index.html").write_text(
+            listing_html(API / str(year), {h: {} for h in halves}))
+        dump(API / f"{year}.json", halves)
+    (API / "index.html").write_text(listing_html(API, {k: {} for k in everything}))
+    dump(SITE / "api.json", everything)
 
     names, long_names, metrics = {}, {}, []
     for d in data.values():
@@ -359,7 +372,7 @@ def main() -> int:
     (SITE / "index.html").write_text(index_html(index))
     (SITE / "404.html").write_text(
         "<!doctype html><meta charset=utf-8><title>404</title>"
-        "<p>Ukendt sti. Se <a href='/afkastforventninger/'>oversigten</a>.</p>\n")
+        "<p>Ukendt sti. Se <a href='/afkastforventninger/'>forsiden</a> eller <a href='/afkastforventninger/api/'>/api/</a>.</p>\n")
     print(f"{len(data)} halvår, {n} tal skrevet til {SITE.name}/ "
           f"(latest={latest}, current={current})")
     return 0

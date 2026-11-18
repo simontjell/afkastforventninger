@@ -4,7 +4,7 @@ Tallene fra [Rådet for Afkastforventninger](https://afkastforventninger.dk/afka
 som decimaltal på faste adresser (GitHub Pages, ingen server).
 
 ```
-https://simontjell.github.io/afkastforventninger/2026/h1/globale-aktier-developed-markets  →  0.067
+https://simontjell.github.io/afkastforventninger/api/2026/h1/globale-aktier-developed-markets  →  0.067
 ```
 
 Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til det regneark, tallene kommer fra.
@@ -13,17 +13,18 @@ Uofficielt. Regnearkene hos rådet er kilden; hvert halvårs `.json` linker til 
 
 | Sti | Indhold |
 |---|---|
-| `/{år}/h{1\|2}/{aktivklasse}` | afkast, horisont 1-10 år |
-| `/{år}/h{1\|2}/{horisont}/{aktivklasse}` | afkast for horisonten |
-| `/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}` | et bestemt nøgletal |
-| `/{år}/h{1\|2}/inflation/{horisont}` | inflationsforventning |
+| `/api/{år}/h{1\|2}/{aktivklasse}` | afkast, horisont 1-10 år |
+| `/api/{år}/h{1\|2}/{horisont}/{aktivklasse}` | afkast for horisonten |
+| `/api/{år}/h{1\|2}/{horisont}/{nøgletal}/{aktivklasse}` | et bestemt nøgletal |
+| `/api/{år}/h{1\|2}/inflation/{horisont}` | inflationsforventning |
 | en adresse + `.json` | samme tal som `application/json` |
-| en mappe + `.json`, fx `/{år}/h{1\|2}/inflation.json` | alle tal under mappen som JSON-objekt |
-| en mappe + `/`, fx `/{år}/h{1\|2}/inflation/` | HTML-oversigt med links til det underliggende |
-| `/{år}/h{1\|2}/horisontafkast` | horisontafkast (fra 2021 h2) |
-| `/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
-| `/latest/…` | nyeste offentliggjorte halvår |
-| `/current/…` | halvåret, der gælder i dag |
+| en mappe + `.json`, fx `/api/{år}/h{1\|2}/inflation.json` | alle tal under mappen som JSON-objekt |
+| en mappe + `/`, fx `/api/{år}/h{1\|2}/inflation/` | HTML-oversigt med links til det underliggende |
+| `/api/{år}/h{1\|2}/horisontafkast` | horisontafkast (fra 2021 h2) |
+| `/api/{år}/h{1\|2}.json` | alt for halvåret, inkl. korrelationer |
+| `/api/latest/…` | nyeste offentliggjorte halvår |
+| `/api/current/…` | halvåret, der gælder i dag |
+| `/api/` | start her: oversigt med links ned gennem alle halvår |
 | `/index.json` | halvår, aktivklasser, horisonter, nøgletal |
 | `/openapi.json` | OpenAPI 3.1-skema for alle adresser |
 
@@ -41,11 +42,11 @@ uden endelse er det `text/html`, med `.json` er det `application/json`. Mønster
 niveauer: `X.json` er alt under `X` som JSON, og `X/` er en side med links til det underliggende.
 
 ```bash
-curl https://simontjell.github.io/afkastforventninger/2027/h1/1-5/globale-aktier-developed-markets
+curl https://simontjell.github.io/afkastforventninger/api/2027/h1/1-5/globale-aktier-developed-markets
 ```
 
 ```
-=IMPORTDATA("https://simontjell.github.io/afkastforventninger/latest/globale-aktier-developed-markets")
+=IMPORTDATA("https://simontjell.github.io/afkastforventninger/api/latest/globale-aktier-developed-markets")
 ```
 
 ## Sådan virker det
